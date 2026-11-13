@@ -1,0 +1,917 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bihar Grid Weather</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f3f6fa;--card:#fff;--ink:#0f1b2d;--muted:#5b6b80;--faint:#94a3b8;--line:#e5eaf1;--soft:#f7f9fc;
+  --accent:#1b4fa3;--rain:#3b9cf0;--out:#f08a24;--cmp:#7c4dff;
+  --red:#c2382c;--redb:#fdeeec;--amb:#9a6400;--ambb:#fff5df;--grn:#17804a;--grnb:#e8f7ef;
+  --r:14px;--sh:0 1px 2px rgba(15,27,45,.05),0 8px 24px -16px rgba(15,27,45,.25);
+}
+*{box-sizing:border-box}html,body{margin:0}
+body{font-family:Inter,"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.4;-webkit-font-smoothing:antialiased}
+button,select{font-family:inherit;color:inherit}
+:focus-visible{outline:3px solid rgba(27,79,163,.35);outline-offset:2px}
+
+/* app bar */
+.bar{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.bar-in{max-width:1200px;margin:0 auto;padding:10px 20px 0}
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#1b4fa3,#3b9cf0);display:grid;place-items:center;flex:0 0 36px}
+.ttl{flex:1 1 180px;min-width:0}
+.ttl h1{font-size:16px;margin:0;font-weight:700;letter-spacing:-.1px}
+.ttl .live{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.dot{width:7px;height:7px;border-radius:50%;background:#22a35a;box-shadow:0 0 0 3px rgba(34,163,90,.18);flex:0 0 7px}
+.sel{position:relative}
+.sel select{appearance:none;-webkit-appearance:none;border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 30px 8px 12px;font-size:14px;font-weight:600;cursor:pointer;max-width:220px}
+.sel::after{content:"";position:absolute;right:12px;top:50%;width:6px;height:6px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:translateY(-70%) rotate(45deg);pointer-events:none}
+.pdfb{display:inline-flex;align-items:center;gap:6px;height:36px;border-radius:10px;border:0;background:var(--accent);color:#fff;font-weight:600;font-size:13px;padding:0 12px;cursor:pointer}.pdfb:disabled{opacity:.6;cursor:wait}
+.toast{position:fixed;left:50%;bottom:18px;transform:translate(-50%,20px);background:#0f1b2d;color:#fff;font-size:13px;border-radius:10px;padding:10px 14px;box-shadow:var(--sh);opacity:0;pointer-events:none;transition:.2s;z-index:50;max-width:92vw}
+.toast.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}.toast a{color:#9fd0ff}
+.ib{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:#fff;display:grid;place-items:center;cursor:pointer}
+.tabs{display:flex;gap:2px;margin-top:8px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{border:0;background:none;padding:10px 14px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2.5px solid transparent;white-space:nowrap}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+
+main{max-width:1200px;margin:0 auto;padding:16px 20px 32px}
+.pane{display:none}.pane.on{display:block}
+.g{display:grid;gap:14px}
+.g2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.g32{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:16px;min-width:0}
+.ch{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.ch h2{margin:0;font-size:14px;font-weight:700}
+.ch small,.muted{color:var(--muted);font-size:12.5px}
+.mt{margin-top:14px}
+
+/* KPI */
+.kpi{position:relative;overflow:hidden}
+.kpi .k{font-size:12px;color:var(--muted);font-weight:500}
+.kpi .v{font-size:28px;font-weight:700;letter-spacing:-.5px;margin:4px 0 2px;line-height:1.1}
+.kpi .v small{font-size:13px;font-weight:500;color:var(--muted);letter-spacing:0;margin-left:4px}
+.kpi .s{font-size:12.5px;color:var(--muted)}
+.kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c,var(--accent))}
+.kpi.pred{background:linear-gradient(160deg,#fff,#f1f6fe)}
+.x{display:inline-block;font-size:11.5px;font-weight:700;border-radius:99px;padding:1px 7px}
+.x.hi{color:var(--red);background:var(--redb)}.x.md{color:var(--amb);background:var(--ambb)}.x.lo{color:var(--grn);background:var(--grnb)}
+.st{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;border-radius:99px;padding:3px 9px;white-space:nowrap}
+.st i{width:7px;height:7px;border-radius:50%}
+.st.b{color:var(--red);background:var(--redb)}.st.b i{background:#df4b3f}
+.st.w{color:var(--amb);background:var(--ambb)}.st.w i{background:#e3a21a}
+.st.n{color:var(--grn);background:var(--grnb)}.st.n i{background:#22a35a}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;border-radius:99px;padding:3px 10px;background:var(--soft);border:1px solid var(--line);color:var(--muted)}
+.chip.lrn{background:var(--ambb);border-color:#f6e2b4;color:var(--amb)}.chip.ok{background:var(--grnb);border-color:#cdebd9;color:var(--grn)}
+
+/* pills */
+.pills{display:flex;gap:8px 12px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.pg{display:inline-flex;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:3px}
+.pill{border:0;background:none;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer}
+.pill.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(15,27,45,.12)}
+
+/* charts */
+svg{display:block}svg text{font-family:inherit}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--muted);margin-top:8px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{display:inline-block;width:14px;height:8px;border-radius:3px}
+.daybox{margin-top:10px;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px}
+.daybox b{font-weight:700}
+.daybox .dl{font-weight:700;color:var(--accent)}
+
+/* attention list */
+.att{display:flex;flex-direction:column}
+.ar{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
+.ar:first-child{border-top:0}
+.ar .an{flex:1;min-width:0}.ar .an b{display:block;font-size:13.5px}.ar .an small{color:var(--muted);font-size:12px}
+.tag{font-size:11px;font-weight:700;border-radius:6px;padding:2px 7px;white-space:nowrap}
+.tag.r{color:var(--red);background:var(--redb)}.tag.a{color:var(--amb);background:var(--ambb)}.tag.b{color:#1d63c4;background:#e9f2fd}
+
+/* weather */
+.hero{border-radius:var(--r);color:#fff;padding:18px;background:linear-gradient(150deg,var(--s1,#2a72c8),var(--s2,#7cbcf0));position:relative;overflow:hidden;box-shadow:var(--sh)}
+.hero::after{content:"";position:absolute;width:320px;height:320px;right:-90px;top:-140px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.25),transparent 65%);pointer-events:none}
+.hero .state,.hero .state b{color:#fff}
+.hm{display:flex;align-items:center;justify-content:space-between;gap:12px;position:relative;z-index:1}
+.hm .t{font-size:64px;font-weight:300;line-height:1;letter-spacing:-2px}
+.hm .c{font-size:16px;font-weight:600;margin-top:4px}.hm .p{font-size:13px;opacity:.9}
+.hm .ic{width:96px;height:96px;flex:0 0 96px}
+.hs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:14px;position:relative;z-index:1}
+.hs div{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.22);border-radius:10px;padding:8px 10px}
+.hs span{display:block;font-size:11px;opacity:.85;text-transform:uppercase;letter-spacing:.5px}.hs b{font-size:16px}
+.hours{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.hr{flex:0 0 58px;text-align:center;border-radius:10px;padding:8px 2px;background:var(--soft);border:1px solid var(--line)}
+.hr .h{font-size:11.5px;color:var(--muted);font-weight:600}.hr svg{width:28px;height:28px;margin:3px auto}
+.hr .tp{font-weight:700;font-size:14px}.hr .pp{font-size:11px;color:#1d7fd6;font-weight:600;min-height:14px}
+.hr .pb{height:4px;border-radius:99px;background:#e3edf8;margin:4px 8px 0;overflow:hidden}.hr .pb span{display:block;height:100%;background:var(--rain)}
+.drow{display:grid;grid-template-columns:78px 30px 64px 40px minmax(0,1fr) 40px;align-items:center;gap:8px;padding:8px 6px;border-top:1px solid var(--line);font-size:14px;cursor:pointer;border-radius:8px}
+.drow:first-child{border-top:0}.drow:hover{background:var(--soft)}.drow.on{background:#eef4fd}
+.drow .dn{font-weight:600}.drow .lo{color:var(--muted);text-align:right}.drow .hi{font-weight:700}
+.drow svg{width:28px;height:28px}
+.rp{font-size:12px;font-weight:600;color:#1d7fd6;white-space:nowrap}.rp.dry{color:var(--faint);font-weight:500}
+.track{position:relative;height:6px;border-radius:99px;background:#edf1f6}
+.track span{position:absolute;top:0;bottom:0;border-radius:99px}
+.track i{position:absolute;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:#fff;border:2px solid var(--ink)}
+details.models summary{cursor:pointer;font-weight:700;font-size:14px;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px}
+details.models summary::-webkit-details-marker{display:none}
+details.models summary::after{content:"Show";font-size:12.5px;font-weight:600;color:var(--accent)}
+details.models[open] summary::after{content:"Hide"}
+.mtab{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+.mtab th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:600;text-align:right;padding:6px 8px;border-bottom:1px solid var(--line)}
+.mtab td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.mtab th:first-child,.mtab td:first-child,.mtab th:nth-child(2),.mtab td:nth-child(2){text-align:left}
+.mtab tr.cons td{background:#f1f6fe;font-weight:700}
+.off{font-size:10.5px;font-weight:700;color:var(--amb);background:var(--ambb);border-radius:99px;padding:1px 6px;margin-left:4px}
+.maplg{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);margin-top:8px;flex-wrap:wrap}
+.maplg i{display:inline-block;width:11px;height:11px;border-radius:50%}
+.links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.lnk{display:flex;gap:10px;align-items:center;text-decoration:none;color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff}
+.lnk:hover{border-color:#c9d6e8}.lnk b{display:block;font-size:13.5px}.lnk small{color:var(--muted);font-size:12px}
+
+/* circle rows */
+.cl{display:flex;flex-direction:column}
+.crow{display:grid;grid-template-columns:minmax(0,1.5fr) 128px minmax(0,1fr) minmax(0,1fr) minmax(0,.9fr);align-items:center;gap:10px;padding:10px 8px;border-top:1px solid var(--line);border-radius:8px}
+.crow.hd{border-top:0;padding-top:0;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:600}
+.crow.tap{cursor:pointer}.crow.tap:hover{background:var(--soft)}.crow.open{background:#eef4fd}
+.cn b{font-size:13.5px;display:flex;align-items:center;gap:4px}.cn small{color:var(--muted);font-size:12px}
+.car{color:var(--faint);transition:transform .15s;display:inline-block}.open .car{transform:rotate(90deg)}
+.cm{font-size:13.5px}.cm b{font-weight:700}.cm small{display:block;color:var(--faint);font-size:11.5px}
+.cm .lbl{display:none}
+.divs{margin:0 8px 8px;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:6px 10px}
+.dv{display:grid;grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(0,1fr));gap:8px;font-size:12.5px;padding:6px 0;border-top:1px solid var(--line)}
+.dv:first-child{border-top:0;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase}
+.more{margin-top:10px;border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;color:var(--accent);cursor:pointer;width:100%}
+.note{font-size:12px;color:var(--muted);margin:12px 0 0;line-height:1.5}
+.pmh{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:2px}.pmh b{font-size:17px}
+.pmg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.pmg>div{background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:9px 10px}
+.pmg span{display:block;font-size:11.5px;color:var(--muted)}.pmg b{display:block;font-size:19px;margin:2px 0}.pmg small{display:block;font-size:11.5px;color:var(--muted)}
+.pf{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.state{text-align:center;padding:28px 12px;color:var(--muted)}
+.state b{display:block;color:var(--ink);margin-bottom:4px}
+.spin{width:28px;height:28px;border-radius:50%;border:3px solid #e3ebf5;border-top-color:var(--accent);margin:0 auto 10px;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.btn{border:0;background:var(--accent);color:#fff;font-weight:600;border-radius:10px;padding:8px 16px;cursor:pointer;margin-top:8px}
+
+@media (max-width:980px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g32{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:760px){
+  .g2{grid-template-columns:minmax(0,1fr)}
+  .crow{grid-template-columns:minmax(0,1fr) auto;gap:6px 10px}
+  .crow.hd{display:none}
+  .crow .cm .lbl{display:block;font-size:11px;color:var(--muted)}
+  .crow .cm.rn{display:none}
+}
+@media (max-width:560px){
+  .bar-in{padding:8px 12px 0}main{padding:12px 12px 24px}
+  .ttl h1{font-size:15px}.sel select{max-width:130px;font-size:13px}.pdfb span{display:none}.pdfb{padding:0 10px}
+  .kpi .v{font-size:22px}.card{padding:13px}
+  .hm .t{font-size:52px}.hm .ic{width:74px;height:74px;flex-basis:74px}
+  .hs{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .drow{grid-template-columns:52px 28px 50px 30px minmax(0,1fr) 30px;gap:6px;font-size:13px}
+  .links,.pf{grid-template-columns:minmax(0,1fr)}
+  .tab{padding:9px 8px;font-size:13px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="bar-in">
+    <div class="top">
+      <div class="logo" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg></div>
+      <div class="ttl"><h1>Bihar Grid &amp; Weather</h1><div class="live"><span class="dot"></span><span id="liveTxt">Connecting</span></div></div>
+      <div class="sel"><select id="dist" aria-label="District"></select></div>
+      <button class="pdfb" id="pdfBtn" aria-label="Export PDF report"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 12v6"/><path d="m9 15 3 3 3-3"/></svg><span>Export PDF</span></button>
+      <button class="ib" id="refresh" aria-label="Refresh"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5b6b80" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg></button>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab on" data-tab="ov" role="tab">Overview</button>
+      <button class="tab" data-tab="wx" role="tab">Weather</button>
+      <button class="tab" data-tab="gr" role="tab">Grid vs Weather</button>
+      <button class="tab" data-tab="pr" role="tab">Prediction</button>
+    </nav>
+  </div>
+</header>
+
+<div class="toast" id="toast" role="status"></div>
+<main>
+  <!-- OVERVIEW -->
+  <section class="pane on" id="p-ov">
+    <div class="pills"><span class="pg" id="disP0"></span></div>
+    <div class="g g4" id="ovKpi"></div>
+    <div class="card mt">
+      <div class="ch"><h2>Rain against outages and complaints</h2><small id="ovChartSub">Bihar · tap a day</small></div>
+      <div id="ovChart"></div>
+      <div class="legend"><span><i style="background:var(--rain);opacity:.55"></i>Rain mm (left)</span><span><i style="background:var(--out);height:3px"></i>Avg outage per feeder, × normal</span><span><i style="background:var(--cmp);height:3px"></i>Supply complaints, × normal</span></div>
+      <div id="ovDay"></div>
+    </div>
+    <div class="g g32 mt">
+      <div class="card"><div class="ch"><h2>Needs attention</h2><small id="attSub"></small></div><div id="att"></div></div>
+      <div class="card"><div class="ch"><h2 id="ovWxTitle">Weather now</h2><small>Live</small></div><div id="ovWx"></div></div>
+    </div>
+  </section>
+
+  <!-- WEATHER -->
+  <section class="pane" id="p-wx">
+    <div class="g g32">
+      <div>
+        <div class="hero" id="hero"></div>
+        <div class="card mt"><div class="ch"><h2>Next 24 hours</h2><small>Temperature and chance of rain</small></div><div class="hours" id="hours"></div></div>
+      </div>
+      <div class="card"><div class="ch"><h2>Rain across Bihar</h2><span class="pg" id="mapDay"></span></div><div id="map"></div>
+        <div class="maplg"><i style="background:#e6edf5"></i>&lt;1 <i style="background:#a9d3f7"></i>1–5 <i style="background:#5aaef2"></i>5–15 <i style="background:#1f78d1"></i>15–35 <i style="background:#5b3cc4"></i>35+ mm · tap a district</div></div>
+    </div>
+    <div class="g g2 mt">
+      <div class="card"><div class="ch"><h2>7-day forecast</h2><small>Combined from 6 models · tap a day</small></div><div id="days"></div></div>
+      <div class="card"><div class="ch"><h2>Temperature across models</h2><small>Band shows the model range</small></div><div id="tchart"></div>
+        <div class="legend"><span><i style="background:rgba(240,138,36,.35)"></i>High</span><span><i style="background:rgba(59,156,240,.35)"></i>Low</span></div>
+        <div class="note" id="agree"></div></div>
+    </div>
+    <div class="card mt">
+      <details class="models"><summary id="mTitle">Compare the 6 forecast models</summary><div id="models"></div></details>
+    </div>
+    <div class="card mt"><div class="ch"><h2>Official warnings</h2><small>Follow IMD for alerts</small></div>
+      <div class="links">
+        <a class="lnk" href="https://mausam.imd.gov.in/patna/" target="_blank" rel="noopener"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c2382c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4"/></svg><span><b>IMD Meteorological Centre, Patna</b><small>District warnings, nowcast and radar</small></span></a>
+        <a class="lnk" href="https://mausamsewa.bihar.gov.in/" target="_blank" rel="noopener"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1b4fa3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.3-7-11.5A7 7 0 0 1 19 9.5C19 14.7 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span><b>Bihar Mausam Sewa Kendra</b><small>Block-level weather stations</small></span></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- GRID VS WEATHER -->
+  <section class="pane" id="p-gr">
+    <div class="pills"><span class="pg" id="disP"></span><span class="pg" id="dayP"></span></div>
+    <div class="g g32">
+      <div class="card"><div class="ch"><h2>Daily trend</h2><small id="grChartSub"></small></div><div id="grChart"></div>
+        <div class="legend"><span><i style="background:var(--rain);opacity:.55"></i>Rain mm</span><span><i style="background:var(--out);height:3px"></i>Avg outage per feeder, × normal</span><span><i style="background:var(--cmp);height:3px"></i>Supply complaints, × normal</span></div>
+        <div id="grDay"></div></div>
+      <div class="card"><div class="ch"><h2>Does rain drive outages?</h2><small id="scSub"></small></div><div class="muted" style="margin:-6px 0 8px">Each dot is one circle on one day. Height shows avg outage per feeder against that circle's normal.</div><div id="scatter"></div>
+        <div class="legend"><span><i style="background:#df4b3f;border-radius:50%;width:9px;height:9px"></i>Beyond weather</span><span><i style="background:#e3a21a;border-radius:50%;width:9px;height:9px"></i>Weather-driven</span><span><i style="background:#9fb3c8;border-radius:50%;width:9px;height:9px"></i>Normal</span></div></div>
+    </div>
+    <div class="card mt"><div class="ch"><h2 id="clTitle">Circles</h2><span id="clCnt"></span></div><div id="cl"></div>
+      <p class="note" id="clNote"></p></div>
+  </section>
+
+  <!-- PREDICTION -->
+  <section class="pane" id="p-pr"><div id="prBody"></div></section>
+</main>
+
+<script>
+(function(){
+'use strict';
+/* ===== Settings ===== */
+// Served by the Apps Script web app: the feed comes through google.script.run (no link needed).
+// Only if this page is hosted somewhere else, paste the web app /exec link here.
+var GAS=typeof google!=='undefined'&&google.script&&google.script.run;
+var GRID_API=GAS?'apps-script':'PASTE_WEB_APP_EXEC_URL_HERE';if(GRID_API.indexOf('PASTE')===0)GRID_API='';
+
+var MODELS=[
+  {id:'ecmwf_ifs025',name:'ECMWF',org:'European Centre'},{id:'gfs_seamless',name:'GFS',org:'NOAA, USA'},
+  {id:'icon_seamless',name:'ICON',org:'DWD, Germany'},{id:'ukmo_seamless',name:'UK Met Office',org:'United Kingdom'},
+  {id:'meteofrance_seamless',name:'Météo-France',org:'France'},{id:'jma_seamless',name:'JMA',org:'Japan'}];
+var D=[["Araria",26.15,87.47],["Arwal",25.25,84.68],["Aurangabad",24.75,84.37],["Banka",24.88,86.92],["Begusarai",25.42,86.13],["Bhagalpur",25.25,87.01],["Bhojpur",25.56,84.66],["Buxar",25.56,83.98],["Darbhanga",26.15,85.9],["East Champaran",26.65,84.92],["Gaya",24.79,85.0],["Gopalganj",26.47,84.44],["Jamui",24.92,86.22],["Jehanabad",25.21,84.99],["Kaimur",25.04,83.61],["Katihar",25.54,87.58],["Khagaria",25.5,86.48],["Kishanganj",26.1,87.95],["Lakhisarai",25.17,86.09],["Madhepura",25.92,86.79],["Madhubani",26.35,86.07],["Munger",25.37,86.47],["Muzaffarpur",26.12,85.39],["Nalanda",25.2,85.52],["Nawada",24.89,85.54],["Patna",25.59,85.14],["Purnia",25.78,87.47],["Rohtas",24.95,84.03],["Saharsa",25.88,86.6],["Samastipur",25.86,85.78],["Saran",25.78,84.73],["Sheikhpura",25.14,85.85],["Sheohar",26.51,85.29],["Sitamarhi",26.6,85.48],["Siwan",26.22,84.36],["Supaul",26.12,86.6],["Vaishali",25.69,85.21],["West Champaran",26.8,84.5]];
+
+/* ===== Helpers ===== */
+var $=function(id){return document.getElementById(id)};
+var nIN=new Intl.NumberFormat('en-IN');
+var f0=function(v){return v==null||isNaN(v)?'–':nIN.format(Math.round(v))};
+var deg=function(v){return v==null||isNaN(v)?'–':Math.round(v)+'°'};
+function hm(min){if(min==null||isNaN(min))return '–';min=Math.max(0,Math.round(min));return Math.floor(min/60)+':'+String(min%60).padStart(2,'0')}
+function med(a){a=a.filter(function(x){return x!=null&&!isNaN(x)}).sort(function(x,y){return x-y});if(!a.length)return null;var m=Math.floor(a.length/2);return a.length%2?a[m]:(a[m-1]+a[m])/2}
+function pear(a,b){var n=a.length;if(n<3)return null;var ma=0,mb=0,i;for(i=0;i<n;i++){ma+=a[i];mb+=b[i]}ma/=n;mb/=n;var s=0,x=0,y=0;for(i=0;i<n;i++){s+=(a[i]-ma)*(b[i]-mb);x+=(a[i]-ma)*(a[i]-ma);y+=(b[i]-mb)*(b[i]-mb)}return x&&y?s/Math.sqrt(x*y):null}
+function dlab(d,o){return new Date(d+'T00:00:00').toLocaleDateString('en-IN',o||{day:'numeric',month:'short'})}
+function relDay(d){var t=new Date(),y=function(x){return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0')};var a=y(t);t.setDate(t.getDate()+1);return d===a?'today':d===y(t)?'tomorrow':dlab(d,{weekday:'short'})}
+function dlong(d){return dlab(d,{weekday:'short',day:'numeric',month:'short'})}
+function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
+function xc(v){if(v==null||isNaN(v))return '';var c=v>=1.8?'hi':v>=1.3?'md':'lo';return '<span class="x '+c+'">'+v.toFixed(1)+'×</span>'}
+function stateHtml(t,s,btn){return '<div class="state">'+(t==='load'?'<div class="spin"></div><b>Loading</b>':'<b>'+t+'</b>'+(s||''))+(btn?'<br><button class="btn" data-retry="'+btn+'">Try again</button>':'')+'</div>'}
+function cw(el,def){var w=el&&el.clientWidth;return w&&w>0?w:def}
+function ri(v){return v==null?'–':Math.round(v)}
+
+/* icons */
+var SUN='<circle cx="32" cy="32" r="11" fill="#FFC83D"/><g stroke="#FFC83D" stroke-width="3.5" stroke-linecap="round"><path d="M32 10v6M32 48v6M10 32h6M48 32h6M16.4 16.4l4.2 4.2M43.4 43.4l4.2 4.2M16.4 47.6l4.2-4.2M43.4 20.6l4.2-4.2"/></g>';
+var MOON='<path d="M40 14a18 18 0 1 0 12 30A16 16 0 0 1 40 14z" fill="#FFE08A"/>';
+var CLOUD=function(c,x,y,s){return '<g transform="translate('+(x||0)+' '+(y||0)+') scale('+(s||1)+')"><path d="M20 50h26a11 11 0 0 0 0-22 15 15 0 0 0-28.5 4A9 9 0 0 0 20 50z" fill="'+c+'"/></g>'};
+function icon(code,day){
+  if(day===undefined)day=1;var o=day?SUN:MOON,s='<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">';
+  var drops=function(n,col){var g='<g stroke="'+col+'" stroke-width="3" stroke-linecap="round">';for(var i=0;i<n;i++){var x=22+i*9;g+='<path d="M'+x+' 50l-3 8"/>'}return g+'</g>'};
+  if(code==null)return s+CLOUD('#d4dce6')+'</svg>';
+  if(code<=1)return s+o+'</svg>';
+  if(code===2)return s+'<g transform="translate(-6 -8) scale(.85)">'+o+'</g>'+CLOUD('#eef2f7',2,4,.95)+'</svg>';
+  if(code===3)return s+CLOUD('#c3cdd8',-4,-6,.8)+CLOUD('#e3e9f0',2,2)+'</svg>';
+  if(code===45||code===48)return s+CLOUD('#d4dce6',0,-6)+'<g stroke="#b3bfcc" stroke-width="3" stroke-linecap="round"><path d="M14 52h36M20 58h28"/></g></svg>';
+  if(code>=95)return s+CLOUD('#9fb0c3',0,-8)+'<path d="M33 40l-7 11h6l-4 10 10-14h-6l4-7z" fill="#FFC83D"/></svg>';
+  if(code>=51&&code<=57)return s+CLOUD('#cfd8e3',0,-8)+drops(2,'#5aa9f0')+'</svg>';
+  if(code>=71&&code<=77)return s+CLOUD('#d4dce6',0,-8)+'<g fill="#9cc7f0"><circle cx="24" cy="54" r="2.5"/><circle cx="34" cy="58" r="2.5"/><circle cx="42" cy="53" r="2.5"/></g></svg>';
+  var heavy=(code===65||code===82);return s+CLOUD(heavy?'#9fb0c3':'#c3cdd8',0,-8)+drops(heavy?3:2,'#2d8fe6')+'</svg>';
+}
+function sky(c){
+  if(c==null)return '–';if(c===0)return 'Clear';if(c===1)return 'Mainly clear';if(c===2)return 'Partly cloudy';if(c===3)return 'Cloudy';
+  if(c===45||c===48)return 'Fog';if(c>=51&&c<=57)return 'Drizzle';if(c===61||c===63)return 'Rain';if(c===65)return 'Heavy rain';
+  if(c>=71&&c<=77)return 'Snow';if(c===80||c===81)return 'Showers';if(c===82)return 'Heavy showers';if(c===95)return 'Thunderstorm';if(c===96||c===99)return 'Storm with hail';return '–';
+}
+var STOPS=[[5,[90,200,250]],[15,[100,210,160]],[22,[255,214,10]],[30,[255,159,10]],[38,[255,69,58]]];
+function tcol(t){if(t<=STOPS[0][0])return 'rgb('+STOPS[0][1]+')';for(var i=1;i<STOPS.length;i++){if(t<=STOPS[i][0]){var a=STOPS[i-1],b=STOPS[i],k=(t-a[0])/(b[0]-a[0]);return 'rgb('+a[1].map(function(v,j){return Math.round(v+(b[1][j]-v)*k)}).join(',')+')'}}return 'rgb('+STOPS[4][1]+')'}
+function rbar(lo,hi,min,max,dot){if(lo==null||hi==null)return '<div class="track"></div>';var r=max-min||1,l=(lo-min)/r*100,w=Math.max(3,(hi-lo)/r*100);
+  return '<div class="track"><span style="left:'+l+'%;width:'+w+'%;background:linear-gradient(90deg,'+tcol(lo)+','+tcol(hi)+')"></span>'+(dot!=null?'<i style="left:'+Math.max(0,Math.min(100,(dot-min)/r*100))+'%"></i>':'')+'</div>'}
+/* Bihar district boundaries (Census 2011, 38 districts; datameet/maps), simplified and projected to a 1010 × 735 frame */
+var BMAP={"d":{"Araria":"M872,258 865,258 864,261 861,260 860,258 854,255 852,252 846,250 838,248 831,249 828,252 820,252 815,256 814,260 814,265 811,268 806,265 801,262 796,262 795,255 792,253 780,253 781,255 774,255 768,251 761,245 758,226 757,225 757,215 751,215 750,220 754,222 755,226 753,229 753,232 752,235 752,239 756,248 756,251 757,255 755,257 757,260 757,263 755,264 756,270 751,271 752,278 756,280 755,285 756,291 758,294 765,306 762,309 763,314 759,315 759,319 755,320 755,323 763,325 764,328 759,331 761,333 764,334 764,337 760,337 760,341 754,349 758,352 759,354 763,353 769,356 778,359 782,355 789,355 794,352 796,349 799,351 799,354 802,354 804,350 813,350 822,354 825,348 828,348 832,350 835,349 840,352 843,349 845,351 855,349 855,345 858,343 868,340 868,336 866,332 868,331 869,327 877,327 878,321 880,312 880,303 882,302 879,294 876,292 876,287 874,284 874,278 867,274 864,267 873,259 872,258Z","Aurangabad":"M206,683 215,678 215,674 218,673 219,667 221,665 225,668 227,664 230,667 231,673 234,672 239,677 245,674 250,674 254,670 256,665 255,663 260,658 260,654 262,645 263,644 268,646 270,640 273,639 281,640 281,636 285,635 286,624 288,621 286,617 287,614 282,613 280,607 276,606 275,602 271,601 269,598 270,595 273,594 277,590 282,590 285,583 283,578 288,578 287,575 290,572 292,565 286,566 285,563 282,560 282,558 288,559 289,557 289,556 289,554 284,549 278,546 277,547 272,545 267,550 267,545 257,546 256,543 253,543 250,545 243,545 240,547 233,546 236,543 230,540 226,551 215,558 210,560 204,565 203,568 192,581 189,584 175,602 162,616 158,620 140,650 147,652 151,655 154,663 157,665 158,670 160,673 160,679 164,684 167,681 170,679 169,674 171,671 175,673 173,676 178,678 179,675 177,671 182,669 186,669 194,672 196,671 196,666 201,666 206,675 207,680 206,683Z","Banka":"M777,558 771,551 767,548 762,548 756,546 748,545 741,546 732,545 727,545 719,545 712,544 707,545 704,543 693,544 690,541 686,543 681,544 677,548 673,556 673,560 674,565 671,571 671,574 663,575 662,580 658,581 657,578 653,578 648,572 643,573 641,575 641,580 640,582 642,586 640,589 643,591 647,594 649,599 648,608 647,611 647,616 642,617 642,622 651,619 652,624 653,626 652,633 655,637 657,638 659,641 665,644 666,649 664,653 665,656 665,659 667,661 672,663 672,665 677,666 687,663 690,663 692,660 692,657 694,654 702,654 704,659 705,666 711,665 711,668 714,669 719,665 726,671 723,661 731,651 737,651 742,653 745,656 754,656 752,652 754,642 758,637 760,630 758,625 761,622 760,618 763,614 759,611 765,603 773,599 775,594 773,587 775,584 773,581 774,571 772,566 777,558Z","Begusarai":"M600,426 598,428 594,427 590,423 581,421 579,415 578,410 574,406 572,398 564,396 564,400 570,401 569,405 565,404 563,403 557,403 559,406 551,407 545,411 548,413 548,416 544,418 546,428 547,434 545,437 536,430 536,429 531,423 523,426 518,420 516,424 510,425 508,431 511,434 510,440 504,440 497,437 494,442 491,444 490,448 489,451 493,447 497,446 502,447 508,451 509,453 519,457 520,463 518,463 516,470 519,474 522,473 529,477 535,479 544,485 545,489 549,488 550,482 553,485 555,490 555,494 557,500 564,502 568,507 573,510 576,508 583,513 588,511 595,505 602,502 606,497 605,494 615,489 620,484 630,479 634,480 637,480 638,476 643,477 644,473 641,473 632,468 631,464 628,462 627,458 622,456 616,462 615,457 609,457 609,453 601,451 599,448 599,438 598,436 601,428 600,426Z","Bhagalpur":"M789,468 786,467 784,469 777,468 774,471 767,471 765,472 759,467 760,463 763,459 763,454 759,459 757,464 751,464 748,465 747,462 742,464 733,463 730,459 725,459 723,462 718,465 716,465 714,467 708,466 707,470 706,476 710,480 710,483 714,487 707,492 705,495 703,495 699,496 700,500 697,504 698,507 694,508 688,512 686,514 678,515 672,514 670,516 672,520 676,521 678,526 683,525 689,528 683,533 678,540 681,544 686,543 690,541 693,544 704,543 707,545 712,544 719,545 727,545 732,545 741,546 748,545 756,546 762,548 767,548 771,551 777,558 779,554 781,554 786,549 790,549 792,546 795,545 798,548 802,549 803,539 805,535 808,519 810,520 817,522 819,519 822,518 835,524 838,525 838,515 843,509 840,503 846,503 849,506 851,502 853,495 851,495 846,490 843,491 840,487 835,487 834,488 829,485 825,484 825,482 816,478 810,476 802,480 800,485 798,486 792,484 790,485 787,482 786,477 783,476 787,473 789,468Z","Bhojpur":"M196,488 196,490 197,495 202,496 206,499 208,502 206,508 207,512 207,519 205,521 209,524 212,526 222,526 226,527 234,533 239,527 247,522 252,521 266,516 272,511 276,502 282,498 286,494 288,488 294,476 297,469 292,459 295,449 301,443 305,440 304,437 307,425 308,422 306,419 311,417 312,414 309,414 303,413 297,415 290,411 285,412 279,412 273,410 267,411 262,404 254,405 254,413 253,416 249,415 246,418 240,415 236,416 235,413 232,410 227,410 227,414 223,413 221,406 219,405 213,413 213,416 206,422 210,426 209,429 211,430 211,433 208,439 208,442 207,447 207,453 212,460 213,463 211,472 205,472 202,478 202,482 200,482 198,488 196,488Z","Buxar":"M219,405 213,403 209,403 207,405 206,419 202,419 200,421 186,421 182,419 181,412 176,408 172,407 164,408 159,410 156,414 158,424 157,427 145,432 131,443 126,444 121,452 117,453 116,457 112,463 109,466 104,465 104,468 109,469 110,472 103,473 101,478 98,480 95,480 94,483 96,487 102,486 103,488 107,491 117,499 120,503 122,503 126,503 134,506 138,510 143,510 148,509 149,505 152,500 148,493 151,491 150,485 156,486 164,489 169,486 183,487 185,491 188,489 194,490 196,488 198,488 200,482 202,482 202,478 205,472 211,472 213,463 212,460 207,453 207,447 208,442 208,439 211,433 211,430 209,429 210,426 206,422 213,416 213,413 219,405Z","Darbhanga":"M495,249 491,249 487,246 483,246 483,251 480,253 481,258 480,262 488,269 487,276 482,277 485,281 485,284 481,288 481,295 487,301 486,309 490,310 492,313 490,316 487,318 484,326 485,335 487,337 491,337 494,334 498,337 507,340 515,341 514,345 516,349 525,352 525,354 529,356 532,354 537,356 538,360 543,358 550,357 554,364 564,369 581,369 584,371 595,366 602,368 604,372 604,375 608,370 609,367 616,359 618,363 622,362 618,357 618,348 619,344 616,342 617,336 612,327 606,324 607,321 605,317 606,310 605,309 600,308 598,305 590,301 590,294 583,295 575,295 572,292 566,296 564,300 553,298 552,302 547,301 547,296 549,295 548,290 545,290 542,286 542,281 544,278 537,273 534,277 528,276 524,277 523,281 518,284 513,282 509,283 506,280 505,275 506,272 505,268 506,260 504,254 500,253 496,256 493,254 495,249Z","Gaya":"M382,557 380,557 377,557 376,555 372,554 371,557 366,557 364,564 359,571 355,568 351,568 350,561 347,562 344,564 340,565 338,568 334,568 332,572 327,571 327,565 323,561 326,560 326,556 321,554 316,554 316,555 314,555 307,554 304,553 301,555 298,554 295,558 292,557 290,557 289,556 289,557 288,559 282,558 282,560 285,563 286,566 292,565 290,572 287,575 288,578 283,578 285,583 282,590 277,590 273,594 270,595 269,598 271,601 275,602 276,606 280,607 282,613 287,614 286,617 288,621 286,624 285,635 281,636 281,640 273,639 270,640 268,646 263,644 262,645 260,654 260,658 255,663 256,665 254,670 250,674 245,674 239,677 234,672 231,673 230,667 227,664 225,668 221,665 219,667 218,673 215,674 215,678 206,683 201,685 199,688 201,691 205,692 208,696 207,700 209,703 214,706 219,705 221,710 227,712 226,718 233,716 235,721 239,721 238,724 241,728 246,717 246,713 248,711 247,708 251,708 255,706 254,703 257,700 262,702 266,702 274,704 276,700 276,696 278,690 284,686 287,686 291,681 298,679 299,676 306,675 309,678 308,687 309,691 312,688 315,690 318,688 318,697 322,704 323,709 327,707 332,709 336,708 341,700 349,697 353,699 356,694 357,701 356,705 359,707 361,707 366,700 372,698 376,696 373,688 383,686 387,687 393,681 399,681 398,676 402,674 406,675 417,674 419,672 420,670 415,668 411,669 405,666 407,663 405,661 405,657 402,650 402,647 400,642 403,641 407,643 406,637 408,633 406,629 402,629 401,624 396,625 397,617 400,617 402,613 403,608 407,601 410,598 408,596 410,594 415,595 418,591 418,580 421,576 418,573 414,571 414,564 410,567 407,566 407,563 394,561 394,566 390,564 390,562 388,556 383,561 382,561 382,558 382,557Z","Gopalganj":"M239,211 238,210 232,206 227,209 226,204 224,204 225,206 218,208 217,209 213,208 208,209 202,209 197,213 194,211 188,209 183,207 176,207 173,204 164,204 158,203 159,210 152,221 152,223 152,225 142,229 137,228 135,232 128,229 123,231 124,233 123,246 131,249 139,249 140,246 145,248 146,250 150,255 153,257 155,259 166,260 177,263 183,268 184,271 189,274 190,275 196,277 199,275 202,275 205,272 209,274 209,278 214,278 215,271 214,264 218,263 222,264 228,262 232,263 232,268 238,271 243,272 247,270 251,274 248,277 252,279 253,276 255,274 259,274 264,278 272,278 271,284 278,286 278,292 284,292 290,295 294,299 303,299 316,297 321,298 323,293 318,294 316,289 309,283 303,282 303,275 297,270 295,269 287,260 283,250 280,249 273,242 268,242 266,245 260,248 259,243 256,241 257,237 254,235 249,237 250,233 243,227 244,222 243,219 240,218 238,213 239,211Z","Jamui":"M643,573 632,570 631,569 630,563 620,557 621,553 625,549 626,546 625,540 616,537 608,542 605,550 603,552 598,552 592,557 593,562 592,566 590,570 588,569 577,558 573,557 570,565 570,568 568,571 568,575 564,576 559,574 557,576 550,573 545,573 543,569 539,572 536,567 534,569 524,566 520,568 515,569 509,572 514,579 514,582 508,580 507,587 515,587 515,583 518,584 519,590 521,598 530,601 533,598 537,599 539,602 543,603 545,607 548,608 553,614 553,618 554,622 556,624 560,625 564,627 568,634 570,641 567,648 568,655 573,658 576,661 582,661 586,660 587,655 593,661 596,662 602,661 607,663 604,667 605,669 603,673 606,678 602,685 599,688 603,690 604,692 607,693 614,693 618,699 623,702 626,707 634,709 636,707 637,703 636,697 641,697 642,693 641,683 644,676 648,672 653,672 655,669 654,667 660,664 660,661 665,656 664,653 666,649 665,644 659,641 657,638 655,637 652,633 653,626 652,624 651,619 642,622 642,617 647,616 647,611 648,608 649,599 647,594 643,591 640,589 642,586 640,582 641,580 641,575 643,573Z","Kaimur":"M94,483 92,479 84,481 83,483 77,484 79,487 73,488 66,496 64,495 56,498 49,499 48,501 43,505 38,506 34,513 30,511 24,514 19,523 14,525 12,525 10,534 12,536 12,544 10,544 8,551 8,558 5,561 6,566 10,567 10,577 13,579 13,588 12,591 15,600 20,606 21,611 19,617 24,619 29,623 32,628 34,628 35,628 38,629 38,635 40,635 44,641 42,643 41,647 45,649 49,655 45,657 47,661 45,668 45,669 47,671 52,670 62,671 69,670 73,668 77,671 82,671 84,667 87,666 90,663 88,660 91,651 87,647 89,642 92,633 93,629 97,627 97,622 96,615 92,613 87,612 86,607 84,606 86,602 93,597 93,588 100,580 103,578 103,572 100,566 105,561 105,551 102,543 105,535 103,528 104,524 107,514 113,514 120,510 120,504 120,503 117,499 107,491 103,488 102,486 96,487 94,483Z","Katihar":"M840,419 839,417 830,417 829,418 826,418 816,416 810,417 801,412 798,412 795,409 791,413 795,419 795,423 798,425 794,427 793,435 796,444 791,448 788,449 787,455 785,461 788,463 789,466 789,470 787,473 783,476 786,477 787,482 790,485 792,484 798,486 800,485 802,480 810,476 816,478 825,482 825,484 829,485 834,488 835,487 840,487 843,491 846,490 851,495 857,494 865,499 869,498 874,500 881,499 883,501 882,506 885,508 885,511 901,514 901,519 904,520 910,523 911,521 908,516 911,513 914,512 915,507 914,502 910,501 904,496 902,497 900,493 902,486 897,484 896,480 901,469 906,472 909,469 911,465 917,465 916,462 918,456 924,455 925,453 929,449 935,449 940,454 941,456 945,458 947,457 950,460 956,460 958,454 949,445 951,442 948,439 952,434 951,431 951,426 953,425 953,418 954,416 952,413 949,413 940,408 933,403 932,400 928,396 924,395 924,390 926,387 922,383 926,379 921,376 918,377 909,374 907,378 906,384 907,388 908,393 904,395 904,398 898,401 894,401 890,398 885,400 880,402 879,409 876,415 873,417 870,414 865,417 862,415 854,417 858,419 855,422 851,418 844,417 840,419Z","Khagaria":"M704,426 698,430 695,429 695,426 691,425 689,421 680,425 679,429 676,430 674,426 670,428 662,430 660,433 656,435 654,432 650,433 644,432 638,426 639,422 636,420 634,415 630,413 627,406 625,406 622,407 619,410 616,411 612,414 607,422 601,423 600,426 601,428 598,436 599,438 599,448 601,451 609,453 609,457 615,457 616,462 622,456 627,458 628,462 631,464 632,468 641,473 644,473 643,470 646,467 651,459 653,457 658,460 661,467 662,474 669,478 671,480 670,484 667,488 673,495 669,500 672,507 674,508 684,508 688,512 694,508 698,507 697,504 700,500 699,496 703,495 705,495 707,492 714,487 710,483 710,480 706,476 707,470 706,464 709,461 708,457 711,453 712,449 711,445 713,440 711,438 711,431 704,426Z","Kishanganj":"M992,245 988,242 983,240 980,236 983,232 991,227 991,223 986,226 981,224 978,226 977,229 973,232 971,231 965,225 963,232 964,236 965,242 962,244 963,249 955,257 950,262 949,266 945,266 941,263 941,258 936,257 930,252 927,249 928,246 925,243 923,239 920,240 915,242 915,246 913,249 909,247 909,245 902,241 898,245 899,249 896,254 893,255 891,252 888,254 886,250 878,249 878,253 873,255 872,258 873,259 864,267 867,274 874,278 874,284 876,287 876,292 879,294 882,302 880,303 880,312 878,321 887,318 887,320 897,321 897,324 902,321 907,321 909,323 913,322 916,325 916,328 913,331 911,338 907,345 907,350 905,355 908,361 910,354 909,349 912,341 912,336 917,333 927,325 929,330 932,327 936,327 936,321 938,321 938,311 941,310 944,314 949,309 952,306 955,307 959,305 968,295 972,294 973,289 980,287 989,281 990,278 993,275 996,270 999,272 1002,267 999,262 992,262 990,259 995,253 998,252 992,245Z","Lakhisarai":"M555,494 552,493 550,495 547,503 540,499 532,497 528,497 528,501 523,503 522,510 526,513 525,515 530,516 532,521 538,530 539,534 534,538 534,552 528,556 528,558 525,560 524,566 534,569 536,567 539,572 543,569 545,573 550,573 557,576 559,574 564,576 568,575 568,571 570,568 570,565 573,557 577,558 588,569 590,570 592,566 593,562 592,557 598,552 603,552 605,550 608,542 616,537 616,531 619,520 618,516 614,506 611,505 607,507 603,505 602,502 595,505 588,511 583,513 576,508 573,510 568,507 564,502 557,500 555,494Z","Madhepura":"M761,333 755,333 752,331 745,328 742,331 729,326 715,325 710,323 708,321 702,322 699,325 689,319 686,324 681,331 678,340 674,341 669,339 668,342 665,344 664,351 669,353 666,358 669,362 672,363 677,360 679,362 680,368 683,367 685,375 688,375 692,377 694,376 701,376 704,374 710,375 713,382 716,386 713,387 714,394 713,397 714,399 711,404 716,406 717,409 714,414 715,418 709,418 705,422 704,426 711,431 711,438 713,440 711,445 712,449 711,453 708,457 709,461 706,464 707,470 708,466 714,467 716,465 718,465 723,462 725,459 730,459 733,463 742,464 747,462 748,465 751,464 757,464 759,459 763,454 759,451 758,453 754,451 755,443 754,438 751,435 752,430 748,424 753,415 751,409 747,408 744,403 745,395 751,382 750,379 747,375 749,373 748,368 745,368 741,360 748,357 748,355 753,356 755,353 759,354 758,352 754,349 760,341 760,337 764,337 764,334 761,333Z","Madhubani":"M687,249 682,247 681,245 669,242 666,237 657,235 653,231 652,227 650,225 642,225 633,219 622,215 621,213 614,211 611,208 604,207 601,209 596,208 593,209 586,214 582,213 581,209 574,209 570,211 570,205 567,206 557,201 556,199 548,197 545,199 537,199 533,201 530,208 524,210 519,215 513,219 512,210 508,209 505,211 506,213 503,222 507,225 501,235 500,230 497,230 494,236 498,239 500,238 504,239 501,244 495,241 493,244 496,246 495,249 493,254 496,256 500,253 504,254 506,260 505,268 506,272 505,275 506,280 509,283 513,282 518,284 523,281 524,277 528,276 534,277 537,273 544,278 542,281 542,286 545,290 548,290 549,295 547,296 547,301 552,302 553,298 564,300 566,296 572,292 575,295 583,295 590,294 590,301 598,305 600,308 605,309 606,310 605,317 607,321 606,324 612,327 617,336 622,336 626,333 628,329 630,323 634,318 639,316 643,318 648,312 647,310 643,309 636,312 633,310 625,309 622,306 623,301 626,301 629,299 636,296 643,296 645,293 644,288 641,287 642,283 645,282 647,277 652,277 657,271 662,269 666,270 668,266 672,263 681,263 681,258 684,250 687,249Z","Munger":"M688,512 684,508 674,508 672,507 669,500 673,495 667,488 670,484 671,480 669,478 662,474 661,467 658,460 653,457 651,459 646,467 643,470 644,473 643,477 638,476 637,480 634,480 630,479 620,484 615,489 605,494 606,497 602,502 603,505 607,507 611,505 614,506 618,516 619,520 616,531 616,537 625,540 626,546 625,549 621,553 620,557 630,563 631,569 632,570 643,573 648,572 653,578 657,578 658,581 662,580 663,575 671,574 671,571 674,565 673,560 673,556 677,548 681,544 678,540 683,533 689,528 683,525 678,526 676,521 672,520 670,516 672,514 678,515 686,514 688,512Z","Muzaffarpur":"M482,277 480,275 476,275 468,271 465,271 464,268 460,266 456,264 458,260 457,258 453,260 451,263 443,261 442,265 435,271 434,278 431,281 429,285 427,283 424,285 421,278 417,275 416,269 414,268 409,269 407,268 401,269 398,268 393,268 390,263 386,263 386,267 393,269 393,277 386,280 382,280 381,273 376,270 373,275 369,276 364,276 362,273 358,274 354,269 350,270 346,275 343,272 340,272 338,274 326,273 322,274 316,289 318,294 323,293 321,298 326,306 324,310 325,314 330,319 331,322 332,332 328,336 329,342 333,344 336,347 341,343 346,349 352,348 355,352 363,351 363,348 367,348 371,348 371,344 375,343 379,345 388,345 391,343 395,343 401,348 398,357 404,359 408,357 415,361 419,362 423,359 426,359 430,363 439,364 440,367 444,368 446,364 453,367 454,363 460,364 463,362 468,363 469,359 467,356 468,352 466,348 467,345 472,344 475,340 478,340 481,336 483,332 484,326 487,318 490,316 492,313 490,310 486,309 487,301 481,295 481,288 485,284 485,281 482,277Z","Nalanda":"M523,503 521,502 518,506 515,506 514,502 509,504 504,504 503,500 497,498 492,498 485,489 480,490 474,494 474,498 468,496 468,494 472,493 467,484 460,483 458,480 457,474 452,475 448,473 441,473 440,469 436,470 429,469 425,466 423,466 422,471 417,473 414,479 410,478 404,479 403,480 388,478 387,476 379,479 378,482 380,484 380,493 377,500 379,503 377,508 380,510 379,513 376,514 374,517 377,519 374,526 375,531 379,533 380,535 376,538 375,546 381,545 384,552 382,557 382,558 382,561 383,561 388,556 390,562 390,564 394,566 394,561 407,563 407,566 410,567 414,564 414,571 418,573 421,576 423,574 428,574 434,571 441,567 447,567 450,570 455,571 456,568 452,564 456,562 463,561 469,556 469,554 474,554 470,547 466,543 462,544 463,540 468,539 473,541 479,538 481,532 481,526 486,527 487,523 486,519 481,517 482,509 487,507 489,510 496,510 496,514 499,516 505,518 507,520 510,515 515,515 517,517 520,518 525,515 526,513 522,510 523,503Z","Nawada":"M509,572 505,572 503,575 501,573 498,568 496,570 492,570 491,565 495,562 497,548 493,546 486,548 479,543 470,547 474,554 469,554 469,556 463,561 456,562 452,564 456,568 455,571 450,570 447,567 441,567 434,571 428,574 423,574 421,576 418,580 418,591 415,595 410,594 408,596 410,598 407,601 403,608 402,613 400,617 397,617 396,625 401,624 402,629 406,629 408,633 406,637 407,643 403,641 400,642 402,647 402,650 405,657 405,661 407,663 405,666 411,669 415,668 420,670 419,672 425,670 429,672 434,671 437,669 442,669 444,673 446,675 450,673 451,669 456,666 455,661 458,657 462,658 464,661 472,663 476,662 477,653 475,647 475,641 473,638 479,637 484,629 484,625 484,620 487,616 490,608 496,610 498,613 505,614 508,611 514,611 518,613 524,622 528,626 533,628 537,628 538,625 543,624 544,621 553,618 553,614 548,608 545,607 543,603 539,602 537,599 533,598 530,601 521,598 519,590 518,584 515,583 515,587 507,587 508,580 514,582 514,579 509,572Z","West Champaran":"M294,123 291,121 281,116 277,115 270,112 271,106 275,102 278,88 276,84 278,82 278,77 279,73 276,65 269,53 266,48 262,47 254,45 246,44 238,42 235,44 233,42 226,40 219,40 209,39 201,35 199,37 196,34 195,27 193,26 192,22 183,22 183,18 178,18 172,14 170,11 164,6 161,8 161,12 158,14 154,15 153,22 146,26 141,23 137,25 134,24 130,24 128,23 123,25 114,25 109,24 108,29 112,32 113,35 118,39 114,46 112,49 108,50 113,54 120,51 124,50 127,53 126,58 122,61 123,67 132,70 135,73 134,75 138,79 139,83 136,86 133,92 131,97 131,103 133,104 145,100 147,102 141,110 147,113 151,113 150,119 152,125 149,135 152,138 153,147 158,150 161,151 163,147 167,147 168,149 169,155 173,159 176,160 178,156 184,152 188,152 192,155 193,158 191,163 193,166 190,175 187,177 191,183 198,179 202,178 206,187 208,194 223,197 224,204 226,204 227,209 232,206 238,210 239,211 246,212 245,206 251,199 256,197 259,197 261,192 264,191 269,191 272,194 275,190 277,189 282,182 286,180 285,172 287,167 290,165 288,162 288,158 285,157 285,155 278,147 279,142 284,134 288,133 291,129 291,127 294,123Z","Patna":"M380,429 369,429 368,428 363,422 362,417 359,410 356,410 347,406 342,406 338,407 332,412 318,410 316,409 312,414 311,417 306,419 308,422 307,425 304,437 305,440 301,443 295,449 292,459 297,469 294,476 288,488 286,494 282,498 286,505 279,508 279,512 283,511 288,512 289,509 299,512 298,516 293,517 292,516 286,521 287,524 292,520 296,519 303,520 308,517 312,518 314,520 316,513 319,512 319,509 322,504 326,503 326,507 329,507 331,504 334,505 340,497 344,498 344,503 347,505 346,509 355,504 358,506 362,504 365,505 368,500 371,499 375,501 377,500 380,493 380,484 378,482 379,479 387,476 388,478 403,480 404,479 410,478 414,479 417,473 422,471 423,466 425,466 429,469 436,470 440,469 441,473 448,473 452,475 457,474 458,480 460,483 467,484 472,493 468,494 468,496 474,498 474,494 480,490 485,489 492,498 497,498 503,500 504,504 509,504 514,502 515,506 518,506 521,502 523,503 528,501 528,497 532,497 540,499 547,503 550,495 552,493 555,494 555,490 553,485 550,482 549,488 545,489 544,485 535,479 529,477 522,473 519,474 516,470 518,463 520,463 519,457 509,453 508,451 502,447 497,446 493,447 489,451 485,451 484,456 478,462 477,458 473,459 470,457 471,465 469,465 460,462 462,459 449,460 449,456 441,458 433,457 429,454 427,458 421,456 418,456 404,454 402,452 396,442 391,436 380,429Z","East Champaran":"M393,177 388,176 383,176 380,172 377,164 379,161 380,152 362,151 359,155 355,156 346,155 348,151 352,147 343,146 341,141 335,140 337,135 333,131 327,129 321,129 312,124 313,121 307,118 305,119 302,122 296,119 294,123 291,127 291,129 288,133 284,134 279,142 278,147 285,155 285,157 288,158 288,162 290,165 287,167 285,172 286,180 282,182 277,189 275,190 272,194 269,191 264,191 261,192 259,197 256,197 251,199 245,206 246,212 239,211 238,213 240,218 243,219 244,222 243,227 250,233 249,237 254,235 257,237 256,241 259,243 260,248 266,245 268,242 273,242 280,249 283,250 287,260 295,269 297,270 303,275 303,282 309,283 316,289 322,274 326,273 338,274 340,272 343,272 346,275 350,270 354,269 358,274 362,273 364,276 369,276 373,275 376,270 381,273 382,280 386,280 393,277 393,269 386,267 386,263 390,263 393,268 398,268 399,261 395,257 393,253 383,251 385,248 384,244 380,241 377,237 378,235 386,233 387,229 385,226 386,223 389,220 394,214 397,205 395,203 395,200 390,194 394,191 392,182 393,177Z","Purnia":"M908,361 905,355 907,350 907,345 911,338 913,331 916,328 916,325 913,322 909,323 907,321 902,321 897,324 897,321 887,320 887,318 878,321 877,327 869,327 868,331 866,332 868,336 868,340 858,343 855,345 855,349 845,351 843,349 840,352 835,349 832,350 828,348 825,348 822,354 813,350 804,350 802,354 799,354 799,351 796,349 794,352 789,355 782,355 778,359 769,356 763,353 759,354 755,353 753,356 748,355 748,357 741,360 745,368 748,368 749,373 747,375 750,379 751,382 745,395 744,403 747,408 751,409 753,415 748,424 752,430 751,435 754,438 755,443 754,451 758,453 759,451 763,454 763,459 760,463 759,467 765,472 767,471 774,471 777,468 784,469 786,467 789,468 788,463 785,461 787,455 788,449 791,448 796,444 793,435 794,427 798,425 795,423 795,419 791,413 795,409 798,412 801,412 810,417 816,416 826,418 829,418 830,417 839,417 840,419 844,417 851,418 855,422 858,419 854,417 862,415 865,417 870,414 873,417 876,415 879,409 880,402 885,400 890,398 894,401 898,401 904,398 904,395 908,393 907,388 906,384 907,378 904,372 908,372 907,365 905,363 908,361Z","Rohtas":"M45,669 40,671 41,674 50,675 56,677 62,677 71,677 78,677 85,679 92,678 98,675 102,674 114,672 116,673 128,670 133,663 136,659 140,650 158,620 162,616 175,602 189,584 192,581 203,568 204,565 210,560 215,558 226,551 230,540 234,533 226,527 222,526 212,526 209,524 205,521 207,519 207,512 206,508 208,502 206,499 202,496 197,495 196,490 196,488 194,490 188,489 185,491 183,487 169,486 164,489 156,486 150,485 151,491 148,493 152,500 149,505 148,509 143,510 138,510 134,506 126,503 122,503 120,503 120,504 120,510 113,514 107,514 104,524 103,528 105,535 102,543 105,551 105,561 100,566 103,572 103,578 100,580 93,588 93,597 86,602 84,606 86,607 87,612 92,613 96,615 97,622 97,627 93,629 92,633 89,642 87,647 91,651 88,660 90,663 87,666 84,667 82,671 77,671 73,668 69,670 62,671 52,670 47,671 45,669Z","Saharsa":"M669,339 666,339 663,341 652,338 650,342 648,343 645,346 640,340 643,333 638,333 634,333 634,329 628,329 626,333 622,336 617,336 616,342 619,344 618,348 618,357 622,362 618,363 616,359 609,367 608,370 604,375 607,378 610,377 614,378 619,388 622,388 625,392 625,400 623,405 625,406 627,406 630,413 634,415 636,420 639,422 638,426 644,432 650,433 654,432 656,435 660,433 662,430 670,428 674,426 676,430 679,429 680,425 689,421 691,425 695,426 695,429 698,430 704,426 705,422 709,418 715,418 714,414 717,409 716,406 711,404 714,399 713,397 714,394 713,387 716,386 713,382 710,375 704,374 701,376 694,376 692,377 688,375 685,375 683,367 680,368 679,362 677,360 672,363 669,362 666,358 669,353 664,351 665,344 668,342 669,339Z","Samastipur":"M604,375 604,372 602,368 595,366 584,371 581,369 564,369 554,364 550,357 543,358 538,360 537,356 532,354 529,356 525,354 525,352 516,349 514,345 515,341 507,340 498,337 494,334 491,337 487,337 485,335 484,326 483,332 481,336 478,340 475,340 472,344 467,345 466,348 468,352 467,356 469,359 468,363 467,371 464,374 463,384 465,386 463,391 464,396 467,397 464,406 464,411 459,413 456,417 454,423 452,431 449,431 448,438 451,443 448,447 449,456 449,460 462,459 460,462 469,465 471,465 470,457 473,459 477,458 478,462 484,456 485,451 489,451 490,448 491,444 494,442 497,437 504,440 510,440 511,434 508,431 510,425 516,424 518,420 523,426 531,423 536,429 536,430 545,437 547,434 546,428 544,418 548,416 548,413 545,411 551,407 559,406 557,403 563,403 565,404 569,405 570,401 564,400 564,396 572,398 574,406 578,410 579,415 581,421 590,423 594,427 598,428 600,426 601,423 607,422 612,414 616,411 619,410 622,407 625,406 623,405 625,400 625,392 622,388 619,388 614,378 610,377 607,378 604,375Z","Saran":"M321,298 316,297 303,299 294,299 297,301 297,306 294,308 293,314 288,316 285,319 282,327 274,329 264,327 263,331 260,330 259,334 255,338 251,339 245,338 241,340 240,338 235,340 224,338 223,343 227,343 227,347 232,347 229,354 233,357 234,364 233,371 236,372 239,371 244,375 248,373 248,383 252,381 260,386 267,392 263,399 268,404 265,406 262,404 267,411 273,410 279,412 285,412 290,411 297,415 303,413 309,414 312,414 316,409 318,410 332,412 338,407 342,406 347,406 356,410 359,410 362,417 363,422 368,428 369,429 380,429 382,427 381,424 381,418 379,408 376,401 378,393 375,383 366,378 365,377 364,370 360,364 358,362 355,352 352,348 346,349 341,343 336,347 333,344 329,342 328,336 332,332 331,322 330,319 325,314 324,310 326,306 321,298Z","Sheikhpura":"M525,515 520,518 517,517 515,515 510,515 507,520 505,518 499,516 496,514 496,510 489,510 487,507 482,509 481,517 486,519 487,523 486,527 481,526 481,532 479,538 473,541 468,539 463,540 462,544 466,543 470,547 479,543 486,548 493,546 497,548 495,562 491,565 492,570 496,570 498,568 501,573 503,575 505,572 509,572 515,569 520,568 524,566 525,560 528,558 528,556 534,552 534,538 539,534 538,530 532,521 530,516 525,515Z","Sheohar":"M395,257 399,249 398,245 409,237 418,236 419,231 415,227 417,222 413,219 413,213 411,205 410,203 406,202 395,203 397,205 394,214 389,220 386,223 385,226 387,229 386,233 378,235 377,237 380,241 384,244 385,248 383,251 393,253 395,257Z","Sitamarhi":"M505,211 502,206 495,205 490,202 489,197 486,194 487,184 489,181 487,179 489,168 487,164 483,160 477,157 470,155 469,151 466,151 463,155 459,156 457,154 455,158 450,159 446,164 443,164 441,168 437,167 436,170 432,171 429,170 423,169 416,177 414,175 409,180 403,178 393,177 392,182 394,191 390,194 395,200 395,203 406,202 410,203 411,205 413,213 413,219 417,222 415,227 419,231 418,236 409,237 398,245 399,249 395,257 399,261 398,268 401,269 407,268 409,269 414,268 416,269 417,275 421,278 424,285 427,283 429,285 431,281 434,278 435,271 442,265 443,261 451,263 453,260 457,258 458,260 456,264 460,266 464,268 465,271 468,271 476,275 480,275 482,277 487,276 488,269 480,262 481,258 480,253 483,251 483,246 487,246 491,249 495,249 496,246 493,244 495,241 501,244 504,239 500,238 498,239 494,236 497,230 500,230 501,235 507,225 503,222 506,213 505,211Z","Siwan":"M294,299 290,295 284,292 278,292 278,286 271,284 272,278 264,278 259,274 255,274 253,276 252,279 248,277 251,274 247,270 243,272 238,271 232,268 232,263 228,262 222,264 218,263 214,264 215,271 214,278 209,278 209,274 205,272 202,275 199,275 196,277 190,275 189,274 184,271 183,268 177,263 176,271 179,275 177,278 176,285 174,288 171,289 165,288 164,292 161,293 157,296 149,294 143,304 143,306 148,310 146,314 151,317 151,321 152,324 160,325 165,329 170,336 176,340 177,346 181,348 183,346 190,350 201,358 205,358 213,355 220,360 224,361 227,369 233,371 234,364 233,357 229,354 232,347 227,347 227,343 223,343 224,338 235,340 240,338 241,340 245,338 251,339 255,338 259,334 260,330 263,331 264,327 274,329 282,327 285,319 288,316 293,314 294,308 297,306 297,301 294,299Z","Supaul":"M761,333 759,331 764,328 763,325 755,323 755,320 759,319 759,315 763,314 762,309 765,306 758,294 756,291 755,285 756,280 752,278 751,271 756,270 755,264 757,263 757,260 755,257 757,255 756,251 756,248 752,239 752,235 753,232 753,229 755,226 754,222 750,220 745,227 735,229 729,232 729,237 721,237 722,243 715,244 711,248 707,247 697,243 693,246 689,251 687,249 684,250 681,258 681,263 672,263 668,266 666,270 662,269 657,271 652,277 647,277 645,282 642,283 641,287 644,288 645,293 643,296 636,296 629,299 626,301 623,301 622,306 625,309 633,310 636,312 643,309 647,310 648,312 643,318 639,316 634,318 630,323 628,329 634,329 634,333 638,333 643,333 640,340 645,346 648,343 650,342 652,338 663,341 666,339 669,339 674,341 678,340 681,331 686,324 689,319 699,325 702,322 708,321 710,323 715,325 729,326 742,331 745,328 752,331 755,333 761,333Z","Vaishali":"M468,363 463,362 460,364 454,363 453,367 446,364 444,368 440,367 439,364 430,363 426,359 423,359 419,362 415,361 408,357 404,359 398,357 401,348 395,343 391,343 388,345 379,345 375,343 371,344 371,348 367,348 363,348 363,351 355,352 358,362 360,364 364,370 365,377 366,378 375,383 378,393 376,401 379,408 381,418 381,424 382,427 380,429 391,436 396,442 402,452 404,454 418,456 421,456 427,458 429,454 433,457 441,458 449,456 448,447 451,443 448,438 449,431 452,431 454,423 456,417 459,413 464,411 464,406 467,397 464,396 463,391 465,386 463,384 464,374 467,371 468,363Z","Arwal":"M316,555 316,554 316,553 316,552 317,549 316,546 317,541 314,536 314,529 313,525 314,522 314,521 314,520 312,518 308,517 303,520 296,519 292,520 287,524 286,521 292,516 293,517 298,516 299,512 289,509 288,512 283,511 279,512 279,508 286,505 282,498 276,502 272,511 266,516 252,521 247,522 239,527 234,533 230,540 236,543 233,546 240,547 243,545 250,545 253,543 256,543 257,546 267,545 267,550 272,545 277,547 278,546 284,549 289,554 289,556 290,557 292,557 295,558 298,554 301,555 304,553 307,554 314,555 316,555Z","Jehanabad":"M377,500 375,501 371,499 368,500 365,505 362,504 358,506 355,504 346,509 347,505 344,503 344,498 340,497 334,505 331,504 329,507 326,507 326,503 322,504 319,509 319,512 316,513 314,520 314,521 314,522 313,525 314,529 314,536 317,541 316,546 317,549 316,552 316,553 316,554 316,555 316,554 321,554 326,556 326,560 323,561 327,565 327,571 332,572 334,568 338,568 340,565 344,564 347,562 350,561 351,568 355,568 359,571 364,564 366,557 371,557 372,554 376,555 377,557 380,557 382,557 384,552 381,545 375,546 376,538 380,535 379,533 375,531 374,526 377,519 374,517 376,514 379,513 380,510 377,508 379,503 377,500Z"},"l":{"Araria":[814,308],"Aurangabad":[223,615],"Banka":[710,601],"Begusarai":[568,458],"Bhagalpur":[759,508],"Bhojpur":[250,464],"Buxar":[165,456],"Darbhanga":[567,332],"Gaya":[335,631],"Gopalganj":[215,236],"Jamui":[601,617],"Kaimur":[57,568],"Katihar":[871,451],"Khagaria":[680,454],"Kishanganj":[920,285],"Lakhisarai":[568,534],"Madhepura":[720,355],"Madhubani":[585,255],"Munger":[647,522],"Muzaffarpur":[420,320],"Nalanda":[431,519],"Nawada":[454,609],"West Champaran":[209,103],"Patna":[350,460],"East Champaran":[326,208],"Purnia":[824,387],"Rohtas":[145,572],"Saharsa":[659,390],"Samastipur":[510,386],"Saran":[304,369],"Sheikhpura":[512,539],"Sheohar":[399,228],"Sitamarhi":[451,217],"Siwan":[207,311],"Supaul":[702,287],"Vaishali":[415,400],"Arwal":[274,530],"Jehanabad":[347,534]},"cl":"M908,361 905,355 907,350 907,345 911,338 913,331 916,328 916,325 913,322 909,323 907,321 902,321 897,324 897,321 887,320 887,318 878,321 877,327 869,327 868,331 866,332 868,336 868,340 858,343 855,345 855,349 845,351 843,349 840,352 835,349 832,350 828,348 825,348 822,354 813,350 804,350 802,354 799,354 799,351 796,349 794,352 789,355 782,355 778,359 769,356 763,353 759,354M759,354 758,352 754,349 760,341 760,337 764,337 764,334 761,333 759,331 764,328 763,325 755,323 755,320 759,319 759,315 763,314 762,309 765,306 758,294 756,291 755,285 756,280 752,278 751,271 756,270 755,264 757,263 757,260 755,257 757,255 756,251 756,248 752,239 752,235 753,232 753,229 755,226 754,222 750,220M140,650 158,620 162,616 175,602 189,584 192,581 203,568 204,565 210,560 215,558 226,551 230,540 234,533M234,533 239,527 247,522 252,521 266,516 272,511 276,502 282,498M282,498 286,505 279,508 279,512 283,511 288,512 289,509 299,512 298,516 293,517 292,516 286,521 287,524 292,520 296,519 303,520 308,517 312,518 314,520M314,520 314,521 314,522 313,525 314,529 314,536 317,541 316,546 317,549 316,552 316,553 316,554 316,555 314,555 307,554 304,553 301,555 298,554 295,558 292,557 290,557 289,556 289,557 288,559 282,558 282,560 285,563 286,566 292,565 290,572 287,575 288,578 283,578 285,583 282,590 277,590 273,594 270,595 269,598 271,601 275,602 276,606 280,607 282,613 287,614 286,617 288,621 286,624 285,635 281,636 281,640 273,639 270,640 268,646 263,644 262,645 260,654 260,658 255,663 256,665 254,670 250,674 245,674 239,677 234,672 231,673 230,667 227,664 225,668 221,665 219,667 218,673 215,674 215,678 206,683M665,656 664,653 666,649 665,644 659,641 657,638 655,637 652,633 653,626 652,624 651,619 642,622 642,617 647,616 647,611 648,608 649,599 647,594 643,591 640,589 642,586 640,582 641,580 641,575 643,573M643,573 648,572 653,578 657,578 658,581 662,580 663,575 671,574 671,571 674,565 673,560 673,556 677,548 681,544 678,540 683,533 689,528 683,525 678,526 676,521 672,520 670,516 672,514 678,515 686,514 688,512M688,512 694,508 698,507 697,504 700,500 699,496 703,495 705,495 707,492 714,487 710,483 710,480 706,476 707,470M707,470 708,466 714,467 716,465 718,465 723,462 725,459 730,459 733,463 742,464 747,462 748,465 751,464 757,464 759,459 763,454M763,454 763,459 760,463 759,467 765,472 767,471 774,471 777,468 784,469 786,467 789,468M787,473 783,476 786,477M792,484M800,485 802,480 810,476M825,482 825,484M834,488 835,487 840,487M688,512 684,508 674,508 672,507 669,500 673,495 667,488 670,484 671,480 669,478 662,474 661,467 658,460 653,457 651,459 646,467 643,470 644,473 643,477 638,476 637,480 634,480 630,479 620,484 615,489 605,494 606,497 602,502M602,502 595,505 588,511 583,513 576,508 573,510 568,507 564,502 557,500 555,494M555,494 555,490 553,485 550,482 549,488 545,489 544,485 535,479 529,477 522,473 519,474 516,470 518,463 520,463 519,457 509,453 508,451 502,447 497,446 493,447 489,451M489,451 490,448 491,444 494,442 497,437 504,440 510,440 511,434 508,431 510,425 516,424 518,420 523,426 531,423 536,429 536,430 545,437 547,434 546,428 544,418 548,416 548,413 545,411 551,407 559,406 557,403 563,403 565,404 569,405 570,401 564,400 564,396 572,398 574,406 578,410 579,415 581,421 590,423 594,427 598,428 600,426 601,423 607,422 612,414 616,411 619,410 622,407 625,406M625,406 627,406 630,413 634,415 636,420 639,422 638,426 644,432 650,433 654,432 656,435 660,433 662,430 670,428 674,426 676,430 679,429 680,425 689,421 691,425 695,426 695,429 698,430 704,426 711,431 711,438 713,440 711,445 712,449 711,453 708,457 709,461 706,464 707,470M262,404 267,411 273,410 279,412 285,412 290,411 297,415 303,413 309,414 312,414M312,414 311,417 306,419 308,422 307,425 304,437 305,440 301,443 295,449 292,459 297,469 294,476 288,488 286,494 282,498M234,533 226,527 222,526 212,526 209,524 205,521 207,519 207,512 206,508 208,502 206,499 202,496 197,495 196,490 196,488 194,490 188,489 185,491 183,487 169,486 164,489 156,486 150,485 151,491 148,493 152,500 149,505 148,509 143,510 138,510 134,506 126,503 122,503 120,503 117,499 107,491 103,488 102,486 96,487 94,483M687,249 684,250 681,258 681,263 672,263 668,266 666,270 662,269 657,271 652,277 647,277 645,282 642,283 641,287 644,288 645,293 643,296 636,296 629,299 626,301 623,301 622,306 625,309 633,310 636,312 643,309 647,310 648,312 643,318 639,316 634,318 630,323 628,329 626,333 622,336 617,336 616,342 619,344 618,348 618,357 622,362 618,363 616,359 609,367 608,370 604,375M604,375 604,372 602,368 595,366 584,371 581,369 564,369 554,364 550,357 543,358 538,360 537,356 532,354 529,356 525,354 525,352 516,349 514,345 515,341 507,340 498,337 494,334 491,337 487,337 485,335 484,326M484,326 487,318 490,316 492,313 490,310 486,309 487,301 481,295 481,288 485,284 485,281 482,277 487,276 488,269 480,262 481,258 480,253 483,251 483,246 487,246 491,249 495,249 496,246 493,244 495,241 501,244 504,239 500,238 498,239 494,236 497,230 500,230 501,235 507,225 503,222 506,213 505,211M377,500 379,503 377,508 380,510 379,513 376,514 374,517 377,519 374,526 375,531 379,533 380,535 376,538 375,546 381,545 384,552 382,557 382,558 382,561 383,561 388,556 390,562 390,564 394,566 394,561 407,563 407,566 410,567 414,564 414,571 418,573 421,576 418,580 418,591 415,595 410,594 408,596 410,598 407,601 403,608 402,613 400,617 397,617 396,625 401,624 402,629 406,629 408,633 406,637 407,643 403,641 400,642 402,647 402,650 405,657 405,661 407,663 405,666 411,669 415,668 420,670 419,672M314,520 316,513 319,512 319,509 322,504 326,503 326,507 329,507 331,504 334,505 340,497 344,498 344,503 347,505 346,509 355,504 358,506 362,504 365,505 368,500 371,499 375,501 377,500M224,204 226,204 227,209 232,206 238,210 239,211 238,213 240,218 243,219 244,222 243,227 250,233 249,237 254,235 257,237 256,241 259,243 260,248 266,245 268,242 273,242 280,249 283,250 287,260 295,269 297,270 303,275 303,282 309,283 316,289M316,289 318,294 323,293 321,298 326,306 324,310 325,314 330,319 331,322 332,332 328,336 329,342 333,344 336,347 341,343 346,349 352,348 355,352 358,362 360,364 364,370 365,377 366,378 375,383 378,393 376,401 379,408 381,418 381,424 382,427 380,429M380,429 369,429 368,428 363,422 362,417 359,410 356,410 347,406 342,406 338,407 332,412 318,410 316,409 312,414M553,618 553,614 548,608 545,607 543,603 539,602 537,599 533,598 530,601 521,598 519,590 518,584 515,583 515,587 507,587 508,580 514,582 514,579 509,572 515,569 520,568 524,566 525,560 528,558 528,556 534,552 534,538 539,534 538,530 532,521 530,516 525,515 526,513 522,510 523,503M523,503 528,501 528,497 532,497 540,499 547,503 550,495 552,493 555,494M602,502 603,505 607,507 611,505 614,506 618,516 619,520 616,531 616,537 625,540 626,546 625,549 621,553 620,557 630,563 631,569 632,570 643,573M763,454 759,451 758,453 754,451 755,443 754,438 751,435 752,430 748,424 753,415 751,409 747,408 744,403 745,395 751,382 750,379 747,375 749,373 748,368 745,368 741,360 748,357 748,355 753,356 755,353 759,354M625,406 623,405 625,400 625,392 622,388 619,388 614,378 610,377 607,378 604,375M484,326 483,332 481,336 478,340 475,340 472,344 467,345 466,348 468,352 467,356 469,359 468,363 467,371 464,374 463,384 465,386 463,391 464,396 467,397 464,406 464,411 459,413 456,417 454,423 452,431 449,431 448,438 451,443 448,447 449,456M449,456 441,458 433,457 429,454 427,458 421,456 418,456 404,454 402,452 396,442 391,436 380,429M316,289 322,274 326,273 338,274 340,272 343,272 346,275 350,270 354,269 358,274 362,273 364,276 369,276 373,275 376,270 381,273 382,280 386,280 393,277 393,269 386,267 386,263 390,263 393,268 398,268 399,261 395,257 393,253 383,251 385,248 384,244 380,241 377,237 378,235 386,233 387,229 385,226 386,223 389,220 394,214 397,205 395,203 395,200 390,194 394,191 392,182 393,177M377,500 380,493 380,484 378,482 379,479 387,476 388,478 403,480 404,479 410,478 414,479 417,473 422,471 423,466 425,466 429,469 436,470 440,469 441,473 448,473 452,475 457,474 458,480 460,483 467,484 472,493 468,494 468,496 474,498 474,494 480,490 485,489 492,498 497,498 503,500 504,504 509,504 514,502 515,506 518,506 521,502 523,503M449,456 449,460 462,459 460,462 469,465 471,465 470,457 473,459 477,458 478,462 484,456 485,451 489,451","ol":"M750,220 751,215 757,215 757,225 758,226 761,245 768,251 774,255 781,255 780,253 792,253 795,255 796,262 801,262 806,265 811,268 814,265 814,260 815,256 820,252 828,252 831,249 838,248 846,250 852,252 854,255 860,258 861,260 864,261 865,258 872,258 873,255 878,253 878,249 886,250 888,254 891,252 893,255 896,254 899,249 898,245 902,241 909,245 909,247 913,249 915,246 915,242 920,240 923,239 925,243 928,246 927,249 930,252 936,257 941,258 941,263 945,266 949,266 950,262 955,257 963,249 962,244 965,242 964,236 963,232 965,225 971,231 973,232 977,229 978,226 981,224 986,226 991,223 991,227 983,232 980,236 983,240 988,242 992,245 998,252 995,253 990,259 992,262 999,262 1002,267 999,272 996,270 993,275 990,278 989,281 980,287 973,289 972,294 968,295 959,305 955,307 952,306 949,309 944,314 941,310 938,311 938,321 936,321 936,327 932,327 929,330 927,325 917,333 912,336 912,341 909,349 910,354 908,361 905,363 907,365 908,372 904,372 907,378 909,374 918,377 921,376 926,379 922,383 926,387 924,390 924,395 928,396 932,400 933,403 940,408 949,413 952,413 954,416 953,418 953,425 951,426 951,431 952,434 948,439 951,442 949,445 958,454 956,460 950,460 947,457 945,458 941,456 940,454 935,449 929,449 925,453 924,455 918,456 916,462 917,465 911,465 909,469 906,472 901,469 896,480 897,484 902,486 900,493 902,497 904,496 910,501 914,502 915,507 914,512 911,513 908,516 911,521 910,523 904,520 901,519 901,514 885,511 885,508 882,506 883,501 881,499 874,500 869,498 865,499 857,494 851,495 853,495 851,502 849,506 846,503 840,503 843,509 838,515 838,525 835,524 822,518 819,519 817,522 810,520 808,519 805,535 803,539 802,549 798,548 795,545 792,546 790,549 786,549 781,554 779,554 777,558 772,566 774,571 773,581 775,584 773,587 775,594 773,599 765,603 759,611 763,614 760,618 761,622 758,625 760,630 758,637 754,642 752,652 754,656 745,656 742,653 737,651 731,651 723,661 726,671 719,665 714,669 711,668 711,665 705,666 704,659 702,654 694,654 692,657 692,660 690,663 687,663 677,666 672,665 672,663 667,661 665,659 665,656 660,661 660,664 654,667 655,669 653,672 648,672 644,676 641,683 642,693 641,697 636,697 637,703 636,707 634,709 626,707 623,702 618,699 614,693 607,693 604,692 603,690 599,688 602,685 606,678 603,673 605,669 604,667 607,663 602,661 596,662 593,661 587,655 586,660 582,661 576,661 573,658 568,655 567,648 570,641 568,634 564,627 560,625 556,624 554,622 553,618 544,621 543,624 538,625 537,628 533,628 528,626 524,622 518,613 514,611 508,611 505,614 498,613 496,610 490,608 487,616 484,620 484,625 484,629 479,637 473,638 475,641 475,647 477,653 476,662 472,663 464,661 462,658 458,657 455,661 456,666 451,669 450,673 446,675 444,673 442,669 437,669 434,671 429,672 425,670 419,672 417,674 406,675 402,674 398,676 399,681 393,681 387,687 383,686 373,688 376,696 372,698 366,700 361,707 359,707 356,705 357,701 356,694 353,699 349,697 341,700 336,708 332,709 327,707 323,709 322,704 318,697 318,688 315,690 312,688 309,691 308,687 309,678 306,675 299,676 298,679 291,681 287,686 284,686 278,690 276,696 276,700 274,704 266,702 262,702 257,700 254,703 255,706 251,708 247,708 248,711 246,713 246,717 241,728 238,724 239,721 235,721 233,716 226,718 227,712 221,710 219,705 214,706 209,703 207,700 208,696 205,692 201,691 199,688 201,685 206,683 207,680 206,675 201,666 196,666 196,671 194,672 186,669 182,669 177,671 179,675 178,678 173,676 175,673 171,671 169,674 170,679 167,681 164,684 160,679 160,673 158,670 157,665 154,663 151,655 147,652 140,650 136,659 133,663 128,670 116,673 114,672 102,674 98,675 92,678 85,679 78,677 71,677 62,677 56,677 50,675 41,674 40,671 45,669 45,668 47,661 45,657 49,655 45,649 41,647 42,643 44,641 40,635 38,635 38,629 35,628 34,628 32,628 29,623 24,619 19,617 21,611 20,606 15,600 12,591 13,588 13,579 10,577 10,567 6,566 5,561 8,558 8,551 10,544 12,544 12,536 10,534 12,525 14,525 19,523 24,514 30,511 34,513 38,506 43,505 48,501 49,499 56,498 64,495 66,496 73,488 79,487 77,484 83,483 84,481 92,479 94,483 95,480 98,480 101,478 103,473 110,472 109,469 104,468 104,465 109,466 112,463 116,457 117,453 121,452 126,444 131,443 145,432 157,427 158,424 156,414 159,410 164,408 172,407 176,408 181,412 182,419 186,421 200,421 202,419 206,419 207,405 209,403 213,403 219,405 221,406 223,413 227,414 227,410 232,410 235,413 236,416 240,415 246,418 249,415 253,416 254,413 254,405 262,404 265,406 268,404 263,399 267,392 260,386 252,381 248,383 248,373 244,375 239,371 236,372 233,371 227,369 224,361 220,360 213,355 205,358 201,358 190,350 183,346 181,348 177,346 176,340 170,336 165,329 160,325 152,324 151,321 151,317 146,314 148,310 143,306 143,304 149,294 157,296 161,293 164,292 165,288 171,289 174,288 176,285 177,278 179,275 176,271 177,263 166,260 155,259 153,257 150,255 146,250 145,248 140,246 139,249 131,249 123,246 124,233 123,231 128,229 135,232 137,228 142,229 152,225 152,223 152,221 159,210 158,203 164,204 173,204 176,207 183,207 188,209 194,211 197,213 202,209 208,209 213,208 217,209 218,208 225,206 224,204 223,197 208,194 206,187 202,178 198,179 191,183 187,177 190,175 193,166 191,163 193,158 192,155 188,152 184,152 178,156 176,160 173,159 169,155 168,149 167,147 163,147 161,151 158,150 153,147 152,138 149,135 152,125 150,119 151,113 147,113 141,110 147,102 145,100 133,104 131,103 131,97 133,92 136,86 139,83 138,79 134,75 135,73 132,70 123,67 122,61 126,58 127,53 124,50 120,51 113,54 108,50 112,49 114,46 118,39 113,35 112,32 108,29 109,24 114,25 123,25 128,23 130,24 134,24 137,25 141,23 146,26 153,22 154,15 158,14 161,12 161,8 164,6 170,11 172,14 178,18 183,18 183,22 192,22 193,26 195,27 196,34 199,37 201,35 209,39 219,40 226,40 233,42 235,44 238,42 246,44 254,45 262,47 266,48 269,53 276,65 279,73 278,77 278,82 276,84 278,88 275,102 271,106 270,112 277,115 281,116 291,121 294,123 296,119 302,122 305,119 307,118 313,121 312,124 321,129 327,129 333,131 337,135 335,140 341,141 343,146 352,147 348,151 346,155 355,156 359,155 362,151 380,152 379,161 377,164 380,172 383,176 388,176 393,177 403,178 409,180 414,175 416,177 423,169 429,170 432,171 436,170 437,167 441,168 443,164 446,164 450,159 455,158 457,154 459,156 463,155 466,151 469,151 470,155 477,157 483,160 487,164 489,168 487,179 489,181 487,184 486,194 489,197 490,202 495,205 502,206 505,211 508,209 512,210 513,219 519,215 524,210 530,208 533,201 537,199 545,199 548,197 556,199 557,201 567,206 570,205 570,211 574,209 581,209 582,213 586,214 593,209 596,208 601,209 604,207 611,208 614,211 621,213 622,215 633,219 642,225 650,225 652,227 653,231 657,235 666,237 669,242 681,245 682,247 687,249 689,251 693,246 697,243 707,247 711,248 715,244 722,243 721,237 729,237 729,232 735,229 745,227 750,220M851,495 846,490 851,495M846,490 843,491 840,487 843,491 846,490M907,378 906,384 907,388 906,384 907,378M789,468 787,473 789,470 789,466 788,463 789,468M786,477 787,482 790,485 792,484 790,485 787,482 786,477M792,484 798,486 800,485 798,486 792,484M810,476 816,478 825,482 816,478 810,476M825,484 829,485 834,488 829,485 825,484M796,444 793,435 796,444M793,435 794,427 793,435M795,423 795,419 791,413 795,419 795,423M826,418 827,418 826,418M858,419 854,417 858,419"};
+var BVW=1010,BVH=735;
+function bmPath(i){return BMAP.d[D[i][0]]||''}
+function bmPt(i){return BMAP.l[D[i][0]]||[0,0]}
+/* place labels without overlap; items: {x,y,txt,size,weight,fill} */
+function bmLabels(items){var boxes=[],o='';items.forEach(function(it){var tw=it.txt.length*it.size*0.56,lx=Math.min(BVW-tw/2-4,Math.max(tw/2+4,it.x));
+  var tries=[it.y,it.y-it.size*1.15,it.y+it.size*1.15];for(var k=0;k<tries.length;k++){var b=[lx-tw/2,tries[k]-it.size*.8,lx+tw/2,tries[k]+it.size*.25];
+    if(!boxes.some(function(q){return b[0]<q[2]&&b[2]>q[0]&&b[1]<q[3]&&b[3]>q[1]})){boxes.push(b);o+='<text x="'+lx+'" y="'+tries[k]+'" text-anchor="middle" font-size="'+it.size+'" font-weight="'+(it.weight||500)+'" fill="'+(it.fill||'#0f1b2d')+'" stroke="#fff" stroke-width="'+(it.size/4)+'" stroke-opacity=".85" paint-order="stroke" style="pointer-events:none">'+it.txt+'</text>';return}}});return o}
+function rainCol(mm){return mm==null||mm<1?'#e6edf5':mm<5?'#a9d3f7':mm<15?'#5aaef2':mm<35?'#1f78d1':'#5b3cc4'}
+
+/* ===== State ===== */
+var S={tab:'ov',dist:25,all:true,wx:null,now:null,map:null,mapDay:0,wSel:0,G:null,gDis:'All',gDays:14,gSel:null,open:null,pAll:false,cAll:false,pLead:0,pSel:null,wxErr:false,gErr:false,lastWx:null};
+
+/* ===== Districts and tabs ===== */
+(function(){var o=document.createElement('option');o.value='all';o.textContent='All districts';$('dist').appendChild(o)})();
+D.forEach(function(d,i){var o=document.createElement('option');o.value=i;o.textContent=d[0];$('dist').appendChild(o)});
+/* last choice is remembered; the figures open on the same scope as the dropdown */
+var sv=store('bgw-district'),si=D.findIndex(function(d){return d[0]===sv});
+if(si>=0){S.dist=si;S.all=false;S.gDis='D:'+D[si][0];$('dist').value=si}else{S.dist=25;S.all=true;S.gDis='All';$('dist').value='all'}
+$('dist').onchange=function(){if(this.value==='all')pickAll();else pickDist(+this.value)};
+/* All districts: statewide figures; the detailed weather stays on the last district picked (Patna to start) */
+function pickAll(){S.all=true;$('dist').value='all';store('bgw-district','All');S.pSel=null;S.open=null;S.gDis='All';renderAll()}
+function pickDist(i){var same=i===S.dist&&S.wx;S.all=false;S.dist=i;$('dist').value=i;store('bgw-district',D[i][0]);S.wSel=0;S.pSel=null;S.open=null;S.gDis='D:'+D[i][0];renderAll();if(!same)loadWeather()}
+/* scope: Bihar, a discom, or 'D:<district>' = the circle(s) covering that district */
+function distCircles(dn){return Object.keys(CIRCLE_DIST).filter(function(c){return CIRCLE_DIST[c].indexOf(dn)>-1})}
+function inScope(c,dc){var g=S.gDis;if(g==='All')return true;if(g.indexOf('D:')===0)return distCircles(g.slice(2)).indexOf(c)>-1;return dc===g}
+function scopeName(){var g=S.gDis;if(g==='All')return 'Bihar';if(g.indexOf('D:')===0){var cs=distCircles(g.slice(2));return g.slice(2)+' ('+cs.map(function(c){return c.toLowerCase().replace(/\b\w/g,function(m){return m.toUpperCase()}).replace('Pesu','PESU')}).join(', ')+(cs.length>1?' circles':' circle')+')'}return g}
+[].forEach.call(document.querySelectorAll('.tab'),function(t){t.onclick=function(){setTab(t.dataset.tab)}});
+function setTab(t){S.tab=t;[].forEach.call(document.querySelectorAll('.tab'),function(x){x.classList.toggle('on',x.dataset.tab===t)});
+  [].forEach.call(document.querySelectorAll('.pane'),function(p){p.classList.toggle('on',p.id==='p-'+t)});renderAll()}
+$('refresh').onclick=function(){loadWeather();loadGrid()};
+$('pdfBtn').onclick=exportPdf;
+document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-retry]');if(!b)return;if(b.dataset.retry==='wx')loadWeather();else loadGrid()});
+
+/* ===== Weather data ===== */
+function loadWeather(){
+  var req=S.wxReq=(S.wxReq||0)+1,want=S.dist;
+  var d=D[S.dist],base='https://api.open-meteo.com/v1/forecast?latitude='+d[1]+'&longitude='+d[2]+'&timezone=Asia%2FKolkata';
+  var u1=base+'&forecast_days=7&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,weather_code&models='+MODELS.map(function(m){return m.id}).join(',');
+  var u2=base+'&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_gusts_10m,weather_code,is_day,precipitation&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,is_day&daily=precipitation_probability_max,sunrise,sunset&forecast_days=2';
+  var u3='https://api.open-meteo.com/v1/forecast?latitude='+D.map(function(x){return x[1]}).join(',')+'&longitude='+D.map(function(x){return x[2]}).join(',')+'&daily=precipitation_sum,precipitation_probability_max,wind_gusts_10m_max&forecast_days=2&timezone=Asia%2FKolkata';
+  var j=function(u){return fetch(u).then(function(r){if(!r.ok)throw 0;return r.json()})};
+  var fresh=!(S.map&&S.mapAt&&Date.now()-S.mapAt<10*60*1000);
+  Promise.all([j(u1),j(u2).catch(function(){return null}),fresh?j(u3).catch(function(){return null}):Promise.resolve(null)]).then(function(r){
+    if(req!==S.wxReq||want!==S.dist)return;   // a newer district was picked meanwhile
+    S.wx=parseModels(r[0]);S.now=r[1];if(r[2]){S.map=Array.isArray(r[2])?r[2]:[r[2]];S.mapAt=Date.now()}
+    S.wxErr=!S.wx;S.lastWx=new Date();renderAll();
+  }).catch(function(){if(req!==S.wxReq)return;S.wxErr=true;renderAll()});
+}
+function parseModels(j){
+  if(!j||!j.daily||!j.daily.time)return null;var dd=j.daily;
+  var out=dd.time.map(function(t,i){
+    var rows=MODELS.map(function(m){var g=function(k){var a=dd[k+'_'+m.id];return a?a[i]:null};
+      return {m:m,hi:g('temperature_2m_max'),lo:g('temperature_2m_min'),rain:g('precipitation_sum'),wind:g('wind_speed_10m_max'),code:g('weather_code')}})
+      .filter(function(r){return r.hi!=null||r.rain!=null});
+    var his=rows.map(function(r){return r.hi}).filter(function(x){return x!=null}),los=rows.map(function(r){return r.lo}).filter(function(x){return x!=null});
+    var wet=rows.filter(function(r){return r.rain!=null&&r.rain>=1}).length,n=rows.filter(function(r){return r.rain!=null}).length,share=n?wet/n:0;
+    var spread=his.length?Math.max.apply(null,his)-Math.min.apply(null,his):0,split=share>0.25&&share<0.75;
+    var conf=(spread<=2.5&&!split)?3:(spread<=4.5?2:1),hiM=med(his);
+    rows.forEach(function(r){r.off=r.hi!=null&&hiM!=null&&Math.abs(r.hi-hiM)>2.5});
+    var codes=rows.map(function(r){return r.code}).filter(function(x){return x!=null}).sort(function(a,b){return a-b});
+    return {date:t,i:i,rows:rows,hi:hiM,lo:med(los),rain:med(rows.map(function(r){return r.rain})),wind:med(rows.map(function(r){return r.wind})),
+      code:codes.length?codes[Math.floor(codes.length/2)]:null,wet:wet,n:n,share:share,spread:spread,conf:conf,
+      hiMin:his.length?Math.min.apply(null,his):null,hiMax:his.length?Math.max.apply(null,his):null,loMin:los.length?Math.min.apply(null,los):null,loMax:los.length?Math.max.apply(null,los):null};
+  }).filter(function(x){return x.rows.length&&x.hi!=null&&x.lo!=null});
+  return out.length?out:null;
+}
+function dayName(d,i,short){if(i===0)return 'Today';if(i===1&&!short)return 'Tomorrow';return dlab(d,short?{weekday:'short'}:{weekday:'short',day:'numeric',month:'short'})}
+var CONF={3:['High','#17804a','The models closely agree.'],2:['Medium','#9a6400','The models differ a little.'],1:['Low','#c2382c','The models disagree. Check IMD before acting.']};
+
+/* ===== Grid data ===== */
+function loadGrid(){
+  if(!GRID_API){S.G=null;renderAll();return}
+  var got=function(j){
+    if(!j||!j.ok)throw 0;S.G=j;S.gErr=false;if(j.dates&&j.dates.length&&(!S.gSel||j.dates.indexOf(S.gSel)<0))S.gSel=j.dates[j.dates.length-1];renderAll();
+  },bad=function(){S.gErr=true;renderAll()};
+  if(GAS){google.script.run.withSuccessHandler(function(t){try{got(JSON.parse(t))}catch(e){bad()}}).withFailureHandler(bad).getFeed(S.gDays);return}
+  fetch(GRID_API+(GRID_API.indexOf('?')>-1?'&':'?')+'days='+S.gDays).then(function(r){if(!r.ok)throw 0;return r.json()}).then(got).catch(bad);
+}
+function gridMissing(){
+  if(!GRID_API)return stateHtml('Grid figures not connected','<span class="muted">Add the web app link to this page to show outages, complaints and predictions.</span>');
+  if(S.gErr)return stateHtml('Could not load the grid figures','<span class="muted">Please check the connection.</span>','gr');
+  if(!S.G)return stateHtml('load');
+  if(!S.G.dates||!S.G.dates.length)return stateHtml('No data yet','<span class="muted">The first daily run has not finished.</span>');
+  return null;
+}
+/* totals per day for the selected discom; avg outage per feeder = total outage minutes / total feeders */
+function agg(dis){
+  var G=S.G,cs=G.circles.filter(function(o){return inScope(o.c,o.dc)});
+  return G.dates.map(function(d){
+    var tf=0,om=0,sc=0,scn=0,nO=0,nTf=0,nS=0,rain=[],o4=0,gu=null;
+    cs.forEach(function(o){var x=o.d[d];if(!x)return;tf+=x[0];om+=x[3];o4+=x[4]||0;if(x[7]!=null)gu=Math.max(gu||0,x[7]);if(x[5]!=null){sc+=x[5];scn++;if(o.nSc!=null)nS+=o.nSc}
+      if(o.nOpf!=null){nO+=o.nOpf*x[0];nTf+=x[0]}if(x[6]!=null)rain.push(x[6])});
+    var opf=tf?om/tf:null,nopf=nTf?nO/nTf:null;
+    return {d:d,tf:tf,opf:opf,sc:scn?sc:null,nopf:nopf,nsc:nS||null,o4:o4,gust:gu,ro:opf!=null&&nopf?opf/nopf:null,rc:scn&&nS?sc/nS:null,rain:rain.length?rain.reduce(function(a,b){return a+b},0)/rain.length:0};
+  });
+}
+function predAgg(dis){
+  var P=S.G&&S.G.prediction;if(!P||!P.circles)return null;
+  var out=[0,1].map(function(lead){var om=0,ol=0,oh=0,tf=0,sc=0,sl=0,sh=0,nO=0,nTf=0,nS=0;
+    Object.keys(P.circles).forEach(function(c){var o=P.circles[c];if(!inScope(c,o.dc))return;var p=o.p[lead];if(!p||!o.tf)return;
+      var gc=S.G.circles.find(function(x){return x.c===c})||{};
+      if(p[0]!=null){om+=p[0];ol+=Math.pow(p[0]-p[1],2);oh+=Math.pow(p[2]-p[0],2);tf+=o.tf;if(gc.nOpf!=null){nO+=gc.nOpf*o.tf;nTf+=o.tf}}
+      if(p[3]!=null){sc+=p[3];sl+=Math.pow(p[3]-p[4],2);sh+=Math.pow(p[5]-p[3],2);if(gc.nSc!=null)nS+=gc.nSc}});
+    if(!tf)return null;
+    return {opf:om/tf,lo:Math.max(0,om-Math.sqrt(ol))/tf,hi:(om+Math.sqrt(oh))/tf,sc:sc,scLo:Math.max(0,sc-Math.sqrt(sl)),scHi:sc+Math.sqrt(sh),ro:nTf?(om/tf)/(nO/nTf):null,rc:nS?sc/nS:null}});
+  return {t:P.targets,a:out,P:P};
+}
+
+/* ===== Charts ===== */
+function comboChart(el,A,sel,onPick){
+  var W=cw(el,640),H=W<500?200:230,pl=34,pr=40,pt=12,pb=26,n=A.length;if(!n){el.innerHTML='';return}
+  var maxR=Math.max(5,Math.max.apply(null,A.map(function(a){return a.rain}))),maxX=Math.max(2,Math.max.apply(null,A.map(function(a){return Math.max(a.ro||0,a.rc||0)})));
+  var stp=[1,2,5,10,15,20,25,50,100].find(function(v){return v*4>=maxR})||Math.ceil(maxR/4);maxR=stp*4;var sx=[0.5,1,1.5,2,2.5,5].find(function(v){return v*4>=maxX})||Math.ceil(maxX/4);maxX=sx*4;
+  var bw=(W-pl-pr)/n,x=function(i){return pl+bw*i+bw/2},yR=function(v){return pt+(1-v/maxR)*(H-pt-pb)},yX=function(v){return pt+(1-v/maxX)*(H-pt-pb)};
+  var s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Rain against outages and complaints">';
+  for(var k=0;k<=4;k++){var vy=pt+k*(H-pt-pb)/4;s+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+vy+'" y2="'+vy+'" stroke="#eef2f7"/>';
+    s+='<text x="'+(pl-6)+'" y="'+(vy+4)+'" text-anchor="end" font-size="10.5" fill="#94a3b8">'+Math.round(maxR*(1-k/4))+'</text><text x="'+(W-pr+6)+'" y="'+(vy+4)+'" font-size="10.5" fill="#94a3b8">'+(maxX*(1-k/4)).toFixed(1)+'×</text>'}
+  s+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+yX(1)+'" y2="'+yX(1)+'" stroke="#94a3b8" stroke-dasharray="4 4"/><text x="'+(W-pr-4)+'" y="'+(yX(1)-4)+'" text-anchor="end" font-size="10" fill="#94a3b8">normal</text>';
+  s+='<rect x="'+(x(sel)-bw/2)+'" y="'+pt+'" width="'+bw+'" height="'+(H-pt-pb)+'" fill="#1b4fa3" fill-opacity=".07" rx="6"/>';
+  A.forEach(function(a,i){var y0=yR(a.rain);s+='<rect x="'+(x(i)-bw*.3)+'" y="'+y0+'" width="'+(bw*.6)+'" height="'+Math.max(0,H-pb-y0)+'" rx="3" fill="#3b9cf0" fill-opacity="'+(i===sel?.85:.42)+'"/>'});
+  var line=function(k,col){var p=[];A.forEach(function(a,i){if(a[k]!=null)p.push(x(i)+','+yX(a[k]))});
+    var r='<polyline points="'+p.join(' ')+'" fill="none" stroke="'+col+'" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
+    A.forEach(function(a,i){if(a[k]!=null)r+='<circle cx="'+x(i)+'" cy="'+yX(a[k])+'" r="'+(i===sel?4.5:2.8)+'" fill="#fff" stroke="'+col+'" stroke-width="2"/>'});return r};
+  s+=line('ro','#f08a24')+line('rc','#7c4dff');
+  var step=Math.max(1,Math.ceil(n/(W<500?5:9)));
+  A.forEach(function(a,i){if(i===sel||(i%step===0&&Math.abs(i-sel)>=Math.max(2,step)))s+='<text x="'+x(i)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10.5" fill="'+(i===sel?'#0f1b2d':'#94a3b8')+'" font-weight="'+(i===sel?700:400)+'">'+dlab(a.d)+'</text>'});
+  A.forEach(function(a,i){s+='<rect data-i="'+i+'" x="'+(x(i)-bw/2)+'" y="0" width="'+bw+'" height="'+H+'" fill="transparent" style="cursor:pointer"><title>'+dlab(a.d)+'</title></rect>'});
+  el.innerHTML=s+'</svg>';
+  [].forEach.call(el.querySelectorAll('rect[data-i]'),function(r){r.onclick=function(){onPick(+r.dataset.i)}});
+}
+function dayBox(a){if(!a)return '';
+  return '<div class="daybox"><span class="dl">'+dlong(a.d)+'</span><span>Rain <b>'+a.rain.toFixed(1)+' mm</b></span><span>Avg outage per feeder <b>'+hm(a.opf)+'</b> '+xc(a.ro)+'</span><span>Supply complaints <b>'+f0(a.sc)+'</b> '+xc(a.rc)+'</span></div>'}
+
+/* ===== Render ===== */
+function renderAll(){
+  var t=S.lastWx?S.lastWx.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'';
+  $('liveTxt').textContent=S.wxErr?'Weather offline, retrying':(t?'Live · updated '+t:'Connecting')+(S.G&&S.G.asOf?' · grid to '+dlab(S.G.asOf):'');
+  if(S.tab==='ov')renderOverview();else if(S.tab==='wx')renderWeather();else if(S.tab==='gr')renderGrid();else renderPred();
+}
+
+/* ---------- Overview ---------- */
+function renderOverview(){
+  var miss=gridMissing(),k='';pillsDis('disP0');
+  if(miss){$('ovKpi').innerHTML='<div class="card" style="grid-column:1/-1">'+miss+'</div>';$('ovChart').innerHTML='';$('ovDay').innerHTML='';$('attSub').textContent='';$('att').innerHTML='<p class="muted">Available once grid figures are connected.</p>'}
+  else{
+    var A=agg(S.gDis),y=A[A.length-1],pa=predAgg(S.gDis);
+    k+='<div class="card kpi" style="--c:var(--out)"><div class="k">Avg outage per feeder · '+dlong(y.d)+'</div><div class="v">'+hm(y.opf)+'<small>h:mm</small></div><div class="s">'+xc(y.ro)+' normal '+hm(y.nopf)+'</div></div>';
+    k+='<div class="card kpi" style="--c:var(--cmp)"><div class="k">Supply complaints · '+dlong(y.d)+'</div><div class="v">'+f0(y.sc)+'</div><div class="s">'+xc(y.rc)+' normal '+f0(y.nsc)+'</div></div>';
+    if(pa&&pa.a[0]){var p=pa.a[0];
+      k+='<div class="card kpi pred"><div class="k">Predicted today · avg outage per feeder</div><div class="v">'+hm(p.opf)+'<small>h:mm</small></div><div class="s">'+xc(p.ro)+' likely '+hm(p.lo)+'–'+hm(p.hi)+'</div></div>';
+      k+='<div class="card kpi pred"><div class="k">Predicted today · supply complaints</div><div class="v">'+f0(p.sc)+'</div><div class="s">'+xc(p.rc)+' likely '+f0(p.scLo)+'–'+f0(p.scHi)+'</div></div>';
+    }else k+='<div class="card kpi pred" style="grid-column:span 2"><div class="k">Prediction for today</div><div class="s" style="margin-top:8px">Available after the first morning run.</div></div>';
+    $('ovKpi').innerHTML=k;
+    var sel=S.G.dates.indexOf(S.gSel);if(sel<0)sel=A.length-1;
+    comboChart($('ovChart'),A,sel,function(i){S.gSel=A[i].d;renderOverview()});$('ovDay').innerHTML=dayBox(A[sel]);
+    $('ovChartSub').textContent=scopeName()+', last '+A.length+' days · tap a day';
+    renderAttention();
+  }
+  renderOvWeather();
+}
+function renderAttention(){
+  var G=S.G,items=[],last=G.asOf,P=G.prediction;
+  if(P&&P.circles)Object.keys(P.circles).forEach(function(c){var o=P.circles[c],p=o.p[0];if(p&&p[6]==='High'&&o.tf)items.push({c:c,dc:o.dc,o:0,tag:'<span class="tag r">High risk today</span>',s:'Predicted '+hm(p[0]/o.tf)+' per feeder, '+f0(p[3])+' complaints'})});
+  G.circles.forEach(function(o){var x=o.d[last];if(x&&x[10]==='B')items.push({c:o.c,dc:o.dc,o:1,tag:'<span class="tag r">Beyond weather</span>',s:dlab(last)+': '+hm(x[0]?x[3]/x[0]:null)+' per feeder ('+(x[8]||0).toFixed(1)+'× normal) without heavy weather'})});
+  var seen={};(G.risk||[]).forEach(function(r){if(seen[r.c])return;seen[r.c]=1;items.push({c:r.c,dc:r.dc,o:2,tag:'<span class="tag b">Heavy weather '+relDay(r.date)+'</span>',s:(r.rain!=null?'Rain '+Math.round(r.rain)+' mm, limit '+r.thr+' mm':'')+(r.gust>=G.cfg.gust?' · gusts '+Math.round(r.gust)+' km/h':'')})});
+  G.circles.forEach(function(o){var x=o.d[last];if(x&&x[10]==='W')items.push({c:o.c,dc:o.dc,o:3,tag:'<span class="tag a">Weather-driven</span>',s:dlab(last)+': '+hm(x[0]?x[3]/x[0]:null)+' per feeder ('+(x[8]||0).toFixed(1)+'× normal)'})});
+  var by={},ord=[];items.forEach(function(i){if(!by[i.c]){by[i.c]={c:i.c,dc:i.dc,o:i.o,tags:[],s:[]};ord.push(by[i.c])}var b=by[i.c];b.o=Math.min(b.o,i.o);b.tags.push(i.tag);b.s.push(i.s)});
+  items=ord.map(function(b){return {c:b.c,dc:b.dc,o:b.o-(b.tags.length>1?0.5:0),tag:'<span style="display:flex;flex-direction:column;gap:3px;align-items:flex-end">'+b.tags.join('')+'</span>',s:b.s.join('<br>')}});
+  items=items.filter(function(i){return inScope(i.c,i.dc)});
+  items.sort(function(a,b){return a.o-b.o});
+  $('attSub').textContent=items.length?items.length+' circles':'';
+  $('att').innerHTML=items.length?'<div class="att">'+items.slice(0,7).map(function(i){return '<div class="ar"><div class="an"><b>'+i.c+' <span class="muted" style="font-weight:500;font-size:11.5px">'+i.dc+'</span></b><small>'+i.s+'</small></div>'+i.tag+'</div>'}).join('')+'</div>'+(items.length>7?'<p class="note">'+(items.length-7)+' more circles in the Grid vs Weather and Prediction tabs.</p>':''):'<p class="muted">All circles near normal, and no heavy weather expected in the next 48 hours.</p>';
+}
+function renderOvWeather(){
+  var el=$('ovWx');
+  if(S.all)return renderOvBihar(el);
+  $('ovWxTitle').textContent='Weather now · '+D[S.dist][0];
+  if(S.wxErr&&!S.wx){el.innerHTML=stateHtml('Weather unavailable','','wx');return}
+  if(!S.now||!S.now.current){el.innerHTML=stateHtml('load');return}
+  var c=S.now.current,t=S.wx&&S.wx[0],tm=S.wx&&S.wx[1];
+  var h='<div style="display:flex;align-items:center;gap:14px"><div style="width:60px;height:60px;flex:0 0 60px">'+icon(c.weather_code,c.is_day)+'</div><div><div style="font-size:34px;font-weight:300;line-height:1">'+deg(c.temperature_2m)+'</div><div style="font-weight:600">'+sky(c.weather_code)+'</div></div></div>';
+  h+='<div class="daybox"><span>Feels <b>'+deg(c.apparent_temperature)+'</b></span><span>Humidity <b>'+ri(c.relative_humidity_2m)+'%</b></span><span>Gusts <b>'+ri(c.wind_gusts_10m)+' km/h</b></span></div>';
+  [[t,'Today'],[tm,'Tomorrow']].forEach(function(z){var v=z[0];if(v)h+='<div class="daybox"><span class="dl">'+z[1]+'</span><span>'+deg(v.lo)+' / '+deg(v.hi)+'</span><span>Rain <b>'+(v.rain==null?'–':v.rain.toFixed(1)+' mm')+'</b> · '+v.wet+' of '+v.n+' models</span></div>'});
+  h+='<button class="more" data-go="wx">Full forecast</button>';
+  el.innerHTML=h;el.querySelector('[data-go]').onclick=function(){setTab('wx')};
+}
+
+function renderOvBihar(el){
+  $('ovWxTitle').textContent='Weather across Bihar';
+  if(!S.map){el.innerHTML=S.wxErr?stateHtml('Weather unavailable','','wx'):stateHtml('load');return}
+  var v=function(i,k,day){var m=S.map[i];return m&&m.daily&&m.daily[k]?m.daily[k][day]:null},h='';
+  [[0,'Today'],[1,'Tomorrow']].forEach(function(z){var day=z[0],rs=D.map(function(d,i){return {i:i,r:v(i,'precipitation_sum',day),g:v(i,'wind_gusts_10m_max',day)}});
+    var wet=rs.filter(function(x){return x.r!=null&&x.r>=1}).length,heavy=rs.filter(function(x){return x.r!=null&&x.r>=15}).length,
+      gmax=rs.reduce(function(a,x){return x.g!=null&&(!a||x.g>a.g)?x:a},null),top=rs.filter(function(x){return x.r!=null&&x.r>=1}).sort(function(a,b){return b.r-a.r}).slice(0,3);
+    h+='<div class="daybox"><span class="dl">'+z[1]+'</span><span>Rain in <b>'+wet+'</b> of '+D.length+' districts'+(heavy?', heavy (15 mm+) in <b>'+heavy+'</b>':'')+'</span>'+
+      (gmax?'<span>Max gust <b>'+Math.round(gmax.g)+' km/h</b> · '+D[gmax.i][0]+'</span>':'')+
+      (top.length?'<span>Wettest '+top.map(function(x){return '<a href="#" data-pd="'+x.i+'" style="color:var(--accent);font-weight:600;text-decoration:none">'+D[x.i][0]+'</a> '+x.r.toFixed(1)+' mm'}).join(', ')+'</span>':'<span>No district expects 1 mm or more</span>')+'</div>'});
+  h+='<button class="more" data-go="wx">Rain map and forecasts</button>';
+  el.innerHTML=h;el.querySelector('[data-go]').onclick=function(){setTab('wx')};
+  [].forEach.call(el.querySelectorAll('[data-pd]'),function(a){a.onclick=function(e){e.preventDefault();pickDist(+a.dataset.pd)}});
+}
+
+/* ---------- Weather ---------- */
+function heroSky(code,day){var h=$('hero').style,set=function(a,b){h.setProperty('--s1',a);h.setProperty('--s2',b)};
+  if(!day)return set('#0f1f44','#34508a');if(code!=null&&code>=95)return set('#33415c','#6b7a99');
+  if(code!=null&&(code>=51||code===3))return set('#4f6b8c','#93aac4');if(code===45||code===48)return set('#7d8fa3','#b9c6d3');set('#2a72c8','#7cbcf0')}
+function renderWeather(){
+  drawMap();
+  if(S.wxErr&&!S.wx){$('hero').innerHTML=stateHtml('Could not load the forecast','','wx');return}
+  if(!S.wx){$('hero').innerHTML=stateHtml('load');return}
+  var c=S.now&&S.now.current,t=S.wx[0],nd=S.now&&S.now.daily;
+  var code=c?c.weather_code:t.code,day=c?c.is_day:1;heroSky(code,day);
+  var sr=nd&&nd.sunrise?nd.sunrise[0].slice(11,16):'–',ss=nd&&nd.sunset?nd.sunset[0].slice(11,16):'–';
+  $('hero').innerHTML='<div class="hm"><div><div style="font-size:15px;font-weight:600;opacity:.95">'+D[S.dist][0]+'</div><div class="t">'+(c?deg(c.temperature_2m):deg(t.hi))+'</div><div class="c">'+sky(code)+'</div><div class="p">H '+deg(t.hi)+' · L '+deg(t.lo)+' · sunrise '+sr+' · sunset '+ss+'</div></div><div class="ic">'+icon(code,day)+'</div></div>'+
+    '<div class="hs"><div><span>Feels like</span><b>'+(c?deg(c.apparent_temperature):'–')+'</b></div><div><span>Humidity</span><b>'+(c?ri(c.relative_humidity_2m)+'%':'–')+'</b></div><div><span>Wind · gusts</span><b>'+(c?ri(c.wind_speed_10m)+' · '+ri(c.wind_gusts_10m):'–')+'</b></div><div><span>Rain chance</span><b>'+(nd&&nd.precipitation_probability_max&&nd.precipitation_probability_max[0]!=null?nd.precipitation_probability_max[0]+'%':'–')+'</b></div></div>';
+  var hh='';
+  if(S.now&&S.now.hourly&&c){var H=S.now.hourly,start=H.time.findIndex(function(x){return x>=c.time.slice(0,13)+':00'});if(start<0)start=0;
+    for(var i=start;i<Math.min(H.time.length,start+24);i++){var p=H.precipitation_probability[i]||0;
+      hh+='<div class="hr"><div class="h">'+(i===start?'Now':H.time[i].slice(11,13)+':00')+'</div>'+icon(H.weather_code[i],H.is_day[i])+'<div class="tp">'+deg(H.temperature_2m[i])+'</div><div class="pp">'+(p>=10?p+'%':'')+'</div><div class="pb"><span style="width:'+p+'%"></span></div></div>'}}
+  $('hours').innerHTML=hh||'<p class="muted">Hourly forecast unavailable.</p>';
+  var days=S.wx,wMin=Math.min.apply(null,days.map(function(d){return d.lo})),wMax=Math.max.apply(null,days.map(function(d){return d.hi}));
+  if(S.wSel>=days.length)S.wSel=0;
+  $('days').innerHTML=days.map(function(d,k){var pct=Math.round(d.share*100);
+    return '<div class="drow'+(k===S.wSel?' on':'')+'" data-k="'+k+'"><span class="dn">'+dayName(d.date,d.i,true)+'</span>'+icon(d.code)+'<span class="rp'+(pct<20?' dry':'')+'">'+(pct<20?'Dry':d.wet+'/'+d.n+' rain')+'</span><span class="lo">'+deg(d.lo)+'</span>'+rbar(d.lo,d.hi,wMin,wMax,(k===0&&c)?c.temperature_2m:null)+'<span class="hi">'+deg(d.hi)+'</span></div>'}).join('');
+  [].forEach.call($('days').querySelectorAll('.drow'),function(r){r.onclick=function(){S.wSel=+r.dataset.k;renderWeather()}});
+  drawTemp();
+  var sd=days[S.wSel],cf=CONF[sd.conf];
+  $('agree').innerHTML='<b style="color:'+cf[1]+'">'+cf[0]+' agreement</b> for '+dayName(sd.date,sd.i).toLowerCase()+'. '+cf[2]+' Highs range '+sd.spread.toFixed(1)+'°, and '+sd.wet+' of '+sd.n+' models expect 1 mm or more of rain.';
+  $('mTitle').textContent='Compare the 6 forecast models · '+dayName(sd.date,sd.i);
+  var mh='<table class="mtab"><tr><th>Model</th><th>Sky</th><th>High</th><th>Low</th><th>Rain mm</th><th>Wind km/h</th></tr>';
+  mh+='<tr class="cons"><td>Combined</td><td>'+sky(sd.code)+'</td><td>'+deg(sd.hi)+'</td><td>'+deg(sd.lo)+'</td><td>'+(sd.rain==null?'–':sd.rain.toFixed(1))+'</td><td>'+f0(sd.wind)+'</td></tr>';
+  sd.rows.forEach(function(r){mh+='<tr><td>'+r.m.name+' <span class="muted" style="font-size:11px">'+r.m.org+'</span></td><td>'+sky(r.code)+'</td><td>'+deg(r.hi)+(r.off?'<span class="off">Differs</span>':'')+'</td><td>'+deg(r.lo)+'</td><td>'+(r.rain==null?'–':r.rain.toFixed(1))+'</td><td>'+f0(r.wind)+'</td></tr>'});
+  $('models').innerHTML='<div style="overflow-x:auto">'+mh+'</table></div>';
+}
+function drawTemp(){
+  var days=S.wx,el=$('tchart'),W=cw(el,520),H=200,pl=30,pr=10,pt=12,pb=26;
+  var vals=[];days.forEach(function(d){[d.hiMin,d.hiMax,d.loMin,d.loMax].forEach(function(v){if(v!=null)vals.push(v)})});if(!vals.length){el.innerHTML='';return}
+  var lo=Math.floor(Math.min.apply(null,vals))-1,hi=Math.ceil(Math.max.apply(null,vals))+1;
+  var x=function(i){return pl+12+(days.length<2?0:i*(W-pl-pr-24)/(days.length-1))},y=function(v){return pt+(hi-v)/(hi-lo)*(H-pt-pb)};
+  var band=function(a,b){return days.map(function(d,i){return x(i)+','+y(d[b])}).concat(days.map(function(d,i){return x(i)+','+y(d[a])}).reverse()).join(' ')};
+  var line=function(k){return days.map(function(d,i){return x(i)+','+y(d[k])}).join(' ')};
+  var s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Temperature across models">',step=Math.max(2,Math.round((hi-lo)/4));
+  for(var v=Math.ceil(lo/step)*step;v<=hi;v+=step)s+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+y(v)+'" y2="'+y(v)+'" stroke="#eef2f7"/><text x="'+(pl-6)+'" y="'+(y(v)+4)+'" text-anchor="end" font-size="10.5" fill="#94a3b8">'+v+'°</text>';
+  s+='<rect x="'+(x(S.wSel)-13)+'" y="'+pt+'" width="26" height="'+(H-pt-pb)+'" rx="7" fill="#1b4fa3" fill-opacity=".07"/>';
+  s+='<polygon points="'+band('hiMin','hiMax')+'" fill="rgba(240,138,36,.22)"/><polygon points="'+band('loMin','loMax')+'" fill="rgba(59,156,240,.22)"/>';
+  s+='<polyline points="'+line('hi')+'" fill="none" stroke="#f08a24" stroke-width="2.5" stroke-linejoin="round"/><polyline points="'+line('lo')+'" fill="none" stroke="#3b9cf0" stroke-width="2.5" stroke-linejoin="round"/>';
+  days.forEach(function(d,i){s+='<circle cx="'+x(i)+'" cy="'+y(d.hi)+'" r="3.5" fill="#fff" stroke="#f08a24" stroke-width="2"/><circle cx="'+x(i)+'" cy="'+y(d.lo)+'" r="3.5" fill="#fff" stroke="#3b9cf0" stroke-width="2"/><text x="'+x(i)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10.5" fill="'+(i===S.wSel?'#0f1b2d':'#94a3b8')+'" font-weight="'+(i===S.wSel?700:400)+'">'+dayName(d.date,d.i,true)+'</text>'});
+  el.innerHTML=s+'</svg>';
+}
+function drawMap(){
+  var el=$('map');
+  $('mapDay').innerHTML=['Today','Tomorrow'].map(function(l,i){return '<button class="pill'+(S.mapDay===i?' on':'')+'" data-md="'+i+'">'+l+'</button>'}).join('');
+  [].forEach.call($('mapDay').querySelectorAll('[data-md]'),function(b){b.onclick=function(){S.mapDay=+b.dataset.md;drawMap()}});
+  if(!S.map){el.innerHTML=S.wxErr?'<p class="muted">Rain map unavailable.</p>':stateHtml('load');return}
+  var wide=cw(el,380)>=520,val=function(i,k){var m=S.map[i];return m&&m.daily&&m.daily[k]?m.daily[k][S.mapDay]:null};
+  var s='<svg viewBox="0 0 '+BVW+' '+BVH+'" width="100%" role="img" aria-label="Rain across Bihar districts">';
+  D.forEach(function(d,i){var r=val(i,'precipitation_sum'),pp=val(i,'precipitation_probability_max'),g=val(i,'wind_gusts_10m_max');
+    s+='<path data-d="'+i+'" d="'+bmPath(i)+'" fill="'+rainCol(r)+'" stroke="#fff" stroke-width="1.6" style="cursor:pointer"><title>'+d[0]+': '+(r==null?'–':r.toFixed(1)+' mm')+(pp!=null?', '+pp+'% chance':'')+(g!=null?', gusts '+Math.round(g)+' km/h':'')+'</title></path>'});
+  s+='<path d="'+BMAP.ol+'" fill="none" stroke="#64748b" stroke-width="2.2" style="pointer-events:none"/>';
+  s+='<path d="'+bmPath(S.dist)+'" fill="none" stroke="#0f1b2d" stroke-width="4.5" style="pointer-events:none"/>';
+  var top=D.map(function(d,i){return {i:i,r:val(i,'precipitation_sum')||0}}).sort(function(a,b){return b.r-a.r}).slice(0,4).filter(function(o){return o.r>=1}).map(function(o){return o.i});
+  var big=[S.dist].concat(top.filter(function(i){return i!==S.dist})),items=big.map(function(i){var r=val(i,'precipitation_sum'),p=bmPt(i);
+    return {x:p[0],y:p[1]+7,txt:D[i][0]+(r!=null&&r>=1?' · '+Math.round(r)+' mm':''),size:wide?22:30,weight:700}});
+  if(wide)D.forEach(function(d,i){if(big.indexOf(i)<0){var p=bmPt(i);items.push({x:p[0],y:p[1]+6,txt:d[0],size:15,weight:500,fill:'#334155'})}});
+  s+=bmLabels(items);
+  el.innerHTML=s+'</svg>';
+  [].forEach.call(el.querySelectorAll('[data-d]'),function(g){g.onclick=function(){pickDist(+g.dataset.d)}});
+}
+
+function pillsDis(id){var el=$(id);if(!el)return;el.innerHTML=['All','SBPDCL','NBPDCL'].concat(S.all?[]:['D:'+D[S.dist][0]]).map(function(p){return '<button class="pill'+(p===S.gDis?' on':'')+'" data-dis="'+p+'">'+(p==='All'?'Bihar':p.indexOf('D:')===0?p.slice(2)+' district':p)+'</button>'}).join('');
+  [].forEach.call($(id).querySelectorAll('[data-dis]'),function(b){b.onclick=function(){var v=b.dataset.dis;if(v.indexOf('D:')!==0&&!S.all){S.all=true;$('dist').value='all';store('bgw-district','All')}S.gDis=v;S.open=null;renderAll()}})}
+function renderGrid(){
+  pillsDis('disP');
+  $('dayP').innerHTML=[14,30,90].map(function(n){return '<button class="pill'+(n===S.gDays?' on':'')+'" data-days="'+n+'">'+n+' days</button>'}).join('');
+  [].forEach.call($('dayP').querySelectorAll('[data-days]'),function(b){b.onclick=function(){if(S.gDays===+b.dataset.days)return;S.gDays=+b.dataset.days;S.G=null;renderAll();loadGrid()}});
+  var miss=gridMissing();
+  if(miss){$('grChart').innerHTML=miss;$('grDay').innerHTML='';$('scatter').innerHTML='';$('scSub').textContent='';$('cl').innerHTML='';$('clNote').textContent='';$('clCnt').innerHTML='';return}
+  var G=S.G,A=agg(S.gDis),sel=G.dates.indexOf(S.gSel),allC=S.cAll;if(sel<0){sel=A.length-1;S.gSel=G.dates[sel]}
+  $('grChartSub').textContent=scopeName()+' · tap a day';
+  comboChart($('grChart'),A,sel,function(i){S.gSel=A[i].d;S.open=null;renderGrid()});$('grDay').innerHTML=dayBox(A[sel]);
+  drawScatter();
+  var d=S.gSel,prev=G.dates[sel-1];
+  var list=G.circles.filter(function(o){return inScope(o.c,o.dc)}).map(function(o){var x=o.d[d];if(!x)return null;var p=prev?o.d[prev]:null;return {o:o,x:x,pr:p?p[6]:null,imp:Math.max(x[8]||0,x[9]||0)}}).filter(Boolean)
+    .sort(function(a,b){var r={B:0,W:1,N:2};return r[a.x[10]]-r[b.x[10]]||b.imp-a.imp});
+  var cnt={B:0,W:0,N:0};list.forEach(function(L){cnt[L.x[10]]++});
+  $('clTitle').textContent='Circles · '+dlong(d);
+  $('clCnt').innerHTML='<span class="st b" title="Beyond weather"><i></i>'+cnt.B+'</span> <span class="st w" title="Weather-driven"><i></i>'+cnt.W+'</span> <span class="st n" title="Normal"><i></i>'+cnt.N+'</span>';
+  var ST={W:['w','Weather-driven'],B:['b','Beyond weather'],N:['n','Normal']},hasDiv=!!(G.divisions&&G.divisions[d]);
+  var h='<div class="cl"><div class="crow hd"><span>Circle</span><span>Status</span><span>Avg outage per feeder</span><span>Supply complaints</span><span>Rain mm · day, prev</span></div>';
+  var shown=allC?list:list.slice(0,8);if(S.open&&!shown.some(function(L){return L.o.c===S.open}))shown=list;
+  shown.forEach(function(L){var x=L.x,o=L.o,open=S.open===o.c;
+    h+='<div class="crow'+(hasDiv?' tap':'')+(open?' open':'')+'" data-c="'+o.c+'"><div class="cn"><b>'+(hasDiv?'<span class="car">›</span>':'')+o.c+'</b><small>'+o.dc+' · '+x[4]+' feeders over 4 h</small></div>'+
+      '<span><span class="st '+ST[x[10]][0]+'"><i></i>'+ST[x[10]][1]+'</span></span>'+
+      '<div class="cm"><span class="lbl">Avg outage / feeder</span><b>'+hm(x[0]?x[3]/x[0]:null)+'</b> '+xc(x[8])+'<small>normal '+hm(o.nOpf)+'</small></div>'+
+      '<div class="cm"><span class="lbl">Supply complaints</span><b>'+f0(x[5])+'</b> '+xc(x[9])+'<small>normal '+f0(o.nSc)+'</small></div>'+
+      '<div class="cm rn"><b>'+(x[6]==null?'–':x[6].toFixed(1))+'</b> · '+(L.pr==null?'–':L.pr.toFixed(1))+'<small>limit '+o.thr+' mm'+(/Learned/.test(o.basis)?' (learned)':'')+(x[7]!=null?' · gust '+Math.round(x[7]):'')+'</small></div></div>';
+    if(open&&hasDiv){var dv=G.divisions[d].filter(function(r){return r[1]===o.c}).sort(function(p,q){return (q[3]?q[6]/q[3]:0)-(p[3]?p[6]/p[3]:0)});
+      h+='<div class="divs"><div class="dv"><span>Division</span><span>Avg outage / feeder</span><span>Feeders with outage</span><span>Over 4 h</span></div>'+
+        dv.map(function(r){return '<div class="dv"><span>'+r[2]+'</span><span><b>'+hm(r[3]?r[6]/r[3]:null)+'</b></span><span>'+f0(r[4])+' of '+f0(r[3])+'</span><span>'+r[7]+'</span></div>'}).join('')+'</div>'}
+  });
+  $('cl').innerHTML=h+'</div>'+(list.length>8?'<button class="more" id="cMore">'+(allC?'Show fewer':'Show all '+list.length+' circles')+'</button>':'');
+  var cm=$('cMore');if(cm)cm.onclick=function(){S.cAll=!S.cAll;renderGrid()};
+  [].forEach.call($('cl').querySelectorAll('.crow.tap'),function(r){r.onclick=function(){S.open=S.open===r.dataset.c?null:r.dataset.c;renderGrid()}});
+  $('clNote').innerHTML='<b>Weather-driven</b>: avg outage per feeder or complaints at '+G.cfg.impactX+'× the circle\'s normal or more, with rain at or above its limit that day or the day before, or gusts of '+G.cfg.gust+' km/h or more. <b>Beyond weather</b>: the same rise without that weather, so check the network. Rain is a model estimate averaged over each circle\'s districts.'+(hasDiv?' Tap a circle to see its divisions.':'');
+}
+function drawScatter(){
+  var G=S.G,el=$('scatter'),pts=[];
+  G.circles.forEach(function(o){if(!inScope(o.c,o.dc))return;G.dates.forEach(function(d,i){var x=o.d[d];if(!x||x[8]==null)return;var p=i?o.d[G.dates[i-1]]:null;
+    pts.push({r:Math.max(x[6]||0,p&&p[6]||0),y:x[8],st:x[10],c:o.c,d:d})})});
+  if(pts.length<5){el.innerHTML='<p class="muted">Not enough days yet.</p>';$('scSub').textContent='';return}
+  var W=cw(el,420),H=W<420?210:230,pl=30,pr=10,pt=10,pb=32,mxR=Math.max(10,Math.max.apply(null,pts.map(function(p){return p.r}))),mxY=Math.max(2,Math.min(8,Math.max.apply(null,pts.map(function(p){return p.y}))));
+  mxR=Math.ceil(mxR/10)*10;mxY=Math.ceil(mxY);
+  var X=function(v){return pl+Math.min(v,mxR)/mxR*(W-pl-pr)},Y=function(v){return pt+(1-Math.min(v,mxY)/mxY)*(H-pt-pb)};
+  var s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Rain against outage per feeder">';
+  for(var k=0;k<=mxY;k++)s+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+Y(k)+'" y2="'+Y(k)+'" stroke="'+(k===1?'#b8c4d3':'#eef2f7')+'"'+(k===1?' stroke-dasharray="4 4"':'')+'/><text x="'+(pl-6)+'" y="'+(Y(k)+4)+'" text-anchor="end" font-size="10.5" fill="#94a3b8">'+k+'×</text>';
+  for(var r=0;r<=mxR;r+=mxR/5)s+='<text x="'+X(r)+'" y="'+(H-16)+'" text-anchor="middle" font-size="10.5" fill="#94a3b8">'+Math.round(r)+'</text>';
+  s+='<text x="'+((W+pl)/2)+'" y="'+(H-2)+'" text-anchor="middle" font-size="10.5" fill="#5b6b80">Rain mm, that day or the day before</text>';
+  var col={B:'#df4b3f',W:'#e3a21a',N:'#9fb3c8'};
+  pts.sort(function(a,b){return (a.st==='N'?0:1)-(b.st==='N'?0:1)}).forEach(function(p){var on=p.d===S.gSel;s+='<circle cx="'+X(p.r)+'" cy="'+Y(p.y)+'" r="'+(on?5:3.6)+'" fill="'+col[p.st]+'" fill-opacity="'+(on?1:.6)+'" stroke="'+(on?'#0f1b2d':'none')+'"><title>'+p.c+', '+dlab(p.d)+': '+p.r.toFixed(1)+' mm, '+p.y.toFixed(1)+'× normal outage</title></circle>'});
+  el.innerHTML=s+'</svg>';
+  var rr=pear(pts.map(function(p){return Math.log(1+p.r)}),pts.map(function(p){return p.y}));
+  $('scSub').textContent=pts.length+' circle-days'+(rr!=null?' · correlation '+rr.toFixed(2)+(rr>=.5?', strong':rr>=.3?', moderate':', weak'):'');
+}
+
+/* ---------- Prediction ---------- */
+function renderPred(){
+  var el=$('prBody'),miss=gridMissing();
+  if(miss){el.innerHTML='<div class="card">'+miss+'</div>';return}
+  var pa=predAgg(S.gDis);
+  if(!pa||!pa.a[0]){el.innerHTML='<div class="card">'+stateHtml('No prediction yet','<span class="muted">The first prediction appears after the next morning run.</span>')+'</div>';return}
+  var P=pa.P,a=pa.a[0],b=pa.a[1],tr=P.track;
+  var h='<div class="pills"><span class="pg" id="disP2"></span>'+(P.learning?'<span class="chip lrn">Learning · '+P.historyDays+' days of history</span>':'<span class="chip ok">Trained on '+P.historyDays+' days</span>')+'</div>';
+  var kp=function(lbl,d,v,s,col,pred){return '<div class="card kpi'+(pred?' pred':'')+'" style="--c:'+col+'"><div class="k">'+lbl+' · '+dlong(d)+'</div><div class="v">'+v+'</div><div class="s">'+s+'</div></div>'};
+  h+='<div class="g g4">'+kp('Avg outage per feeder',P.targets[0],hm(a.opf)+'<small>h:mm</small>',xc(a.ro)+' likely '+hm(a.lo)+'–'+hm(a.hi),'var(--accent)',1)+
+    kp('Supply complaints',P.targets[0],f0(a.sc),xc(a.rc)+' likely '+f0(a.scLo)+'–'+f0(a.scHi),'var(--cmp)',1);
+  if(b)h+=kp('Avg outage per feeder',P.targets[1],hm(b.opf)+'<small>h:mm</small>',xc(b.ro)+' likely '+hm(b.lo)+'–'+hm(b.hi),'#9fb3c8',0)+
+    kp('Supply complaints',P.targets[1],f0(b.sc),xc(b.rc)+' likely '+f0(b.scLo)+'–'+f0(b.scHi),'#9fb3c8',0);
+  h+='</div>';
+  h+='<div class="g g32 mt"><div class="card"><div class="ch"><h2>Prediction map</h2><span class="pg" id="pmLead"></span></div><div id="pmap"></div>'+
+    '<div class="maplg"><i style="background:#df4b3f"></i>High <i style="background:#e3a21a"></i>Medium <i style="background:#22a35a;opacity:.55"></i>Normal <i style="background:#3b9cf0"></i>Rain expected, larger dot more rain · thick lines are circle boundaries</div></div>'+
+    '<div class="card" id="pmDet"></div></div>';
+  h+='<div class="g g32 mt"><div class="card"><div class="ch"><h2>Predicted against actual</h2><small>Bihar avg outage per feeder</small></div><div id="pvChart"></div>'+
+    '<div class="legend"><span><i style="background:var(--out);opacity:.45"></i>Actual</span><span><i style="background:var(--accent);height:3px"></i>Predicted that morning</span></div></div>';
+  h+='<div class="card"><div class="ch"><h2>Track record</h2><small>Last 30 days</small></div>'+(tr&&tr.days?
+    '<div class="pf"><div class="daybox" style="margin:0;display:block"><div class="muted">Circle outages within range</div><div style="font-size:24px;font-weight:700">'+tr.outIn+'%</div></div><div class="daybox" style="margin:0;display:block"><div class="muted">Circle complaints within range</div><div style="font-size:24px;font-weight:700">'+tr.cmpIn+'%</div></div></div>'+
+    '<p class="note">Bihar totals were off by '+tr.outErr+'% for outages and '+tr.cmpErr+'% for complaints on average over '+tr.days+' day'+(tr.days>1?'s':'')+'. The range is set to hold about 8 days in 10.</p>':
+    '<p class="muted">Starts once the first prediction is checked against actual figures.</p>')+
+    '<p class="note">Uses each circle\'s normal, yesterday\'s figures, rain today and the two days before, gusts, heat and day of week.'+(P.learning?' Figures will settle as more days are recorded.':'')+'</p></div></div>';
+  var rk={High:0,Medium:1,Normal:2},keys=Object.keys(P.circles).filter(function(c){return inScope(c,P.circles[c].dc)});
+  var list=keys.map(function(c){var o=P.circles[c];return {c:c,dc:o.dc,tf:o.tf,a:o.p[0],b:o.p[1]}}).filter(function(x){return x.a&&x.tf&&x.a[0]!=null})
+    .sort(function(x,y){return rk[x.a[6]]-rk[y.a[6]]||(y.a[0]/y.tf)-(x.a[0]/x.tf)});
+  var show=S.pAll?list:list.slice(0,8),rc=function(r){return '<span class="st '+(r==='High'?'b':r==='Medium'?'w':'n')+'"><i></i>'+r+'</span>'};
+  h+='<div class="card mt"><div class="ch"><h2>Circles · '+dlong(P.targets[0])+'</h2><small>Sorted by risk</small></div><div class="cl"><div class="crow hd"><span>Circle</span><span>Risk today</span><span>Avg outage per feeder</span><span>Supply complaints</span><span>Tomorrow</span></div>';
+  show.forEach(function(x){var a=x.a,gc=S.G.circles.find(function(o){return o.c===x.c})||{};
+    h+='<div class="crow"><div class="cn"><b>'+x.c+'</b><small>'+x.dc+' · normal '+hm(gc.nOpf)+'</small></div><span>'+rc(a[6])+'</span>'+
+      '<div class="cm"><span class="lbl">Avg outage / feeder</span><b>'+hm(a[0]/x.tf)+'</b><small>'+hm(a[1]/x.tf)+' to '+hm(a[2]/x.tf)+'</small></div>'+
+      '<div class="cm"><span class="lbl">Supply complaints</span><b>'+f0(a[3])+'</b><small>'+f0(a[4])+' to '+f0(a[5])+'</small></div>'+
+      '<div class="cm rn">'+(x.b?rc(x.b[6]):'–')+'</div></div>'});
+  h+='</div>'+(list.length>8?'<button class="more" id="pMore">'+(S.pAll?'Show fewer':'Show all '+list.length+' circles')+'</button>':'')+'</div>';
+  el.innerHTML=h;pillsDis('disP2');
+  var pm=$('pMore');if(pm)pm.onclick=function(){S.pAll=!S.pAll;renderPred()};
+  drawPv(P);drawPredMap();
+}
+function drawPv(P){
+  var el=$('pvChart'),H0=(P.hist||[]).filter(function(r){return r[5]});
+  if(H0.length<2){el.innerHTML='<p class="muted">Appears after a few days of predictions.</p>';return}
+  var A=H0.map(function(r){return {d:r[0],p:r[1]/r[5],a:r[2]/r[5]}}),W=cw(el,600),H=200,pl=40,pr=10,pt=10,pb=26,n=A.length;
+  var mx=Math.max.apply(null,A.map(function(a){return Math.max(a.p,a.a)}))*1.1||1,bw=(W-pl-pr)/n,x=function(i){return pl+bw*i+bw/2},y=function(v){return pt+(1-v/mx)*(H-pt-pb)};
+  var s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Predicted against actual">';
+  for(var k=0;k<=3;k++){var v=mx*k/3;s+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+y(v)+'" y2="'+y(v)+'" stroke="#eef2f7"/><text x="'+(pl-6)+'" y="'+(y(v)+4)+'" text-anchor="end" font-size="10.5" fill="#94a3b8">'+hm(v)+'</text>'}
+  A.forEach(function(a,i){s+='<rect x="'+(x(i)-bw*.3)+'" y="'+y(a.a)+'" width="'+(bw*.6)+'" height="'+(H-pb-y(a.a))+'" rx="3" fill="#f08a24" fill-opacity=".4"><title>'+dlab(a.d)+': actual '+hm(a.a)+', predicted '+hm(a.p)+'</title></rect>'});
+  s+='<polyline points="'+A.map(function(a,i){return x(i)+','+y(a.p)}).join(' ')+'" fill="none" stroke="#1b4fa3" stroke-width="2.5" stroke-linejoin="round"/>';
+  var step=Math.max(1,Math.ceil(n/(W<500?5:8)));
+  A.forEach(function(a,i){s+='<circle cx="'+x(i)+'" cy="'+y(a.p)+'" r="3" fill="#fff" stroke="#1b4fa3" stroke-width="2"/>';if(i%step===0||i===n-1)s+='<text x="'+x(i)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10.5" fill="#94a3b8">'+dlab(a.d)+'</text>'});
+  el.innerHTML=s+'</svg>';
+}
+
+/* ===== Prediction map ===== */
+var CIRCLE_DIST={'ARRAH':['Bhojpur','Buxar'],'AURANGABAD':['Aurangabad','Arwal'],'BHAGALPUR':['Bhagalpur','Banka'],'BIHARSARIF':['Nalanda','Nawada','Sheikhpura'],
+  'GAYA JI':['Gaya','Jehanabad'],'JAMUI':['Jamui','Lakhisarai'],'MUNGER':['Munger'],'PATNA':['Patna'],'PESU EAST':['Patna'],'PESU WEST':['Patna'],'SASARAM':['Rohtas','Kaimur'],
+  'BEGUSARAI':['Begusarai','Khagaria'],'CHAPRA':['Saran','Siwan','Gopalganj'],'DARBHANGA':['Darbhanga','Madhubani'],'KISHANGANJ':['Kishanganj','Araria'],
+  'MOTIHARI':['East Champaran','West Champaran'],'MUZAFFARPUR':['Muzaffarpur','Sitamarhi','Sheohar','Vaishali'],'PURNEA':['Purnia','Katihar'],
+  'SAHARSA':['Saharsa','Supaul','Madhepura'],'SAMASTIPUR':['Samastipur']};
+var RISKC={High:'#df4b3f',Medium:'#e3a21a',Normal:'#22a35a'},RISKN={High:2,Medium:1,Normal:0};
+/* one entry per district: the worst predicted circle covering it */
+function predByDistrict(lead){
+  var P=S.G&&S.G.prediction;if(!P||!P.circles)return null;var out={};
+  Object.keys(P.circles).forEach(function(c){var o=P.circles[c],p=o.p[lead];if(!p||!o.tf)return;if(S.gDis!=='All'&&S.gDis.indexOf('D:')!==0&&o.dc!==S.gDis)return;
+    (CIRCLE_DIST[c]||[]).forEach(function(dn){var cur=out[dn],v={c:c,dc:o.dc,risk:p[6],opf:p[0]/o.tf,lo:p[1]/o.tf,hi:p[2]/o.tf,sc:p[3],scLo:p[4],scHi:p[5]};
+      if(!cur||RISKN[v.risk]>RISKN[cur.risk]||(RISKN[v.risk]===RISKN[cur.risk]&&v.opf>cur.opf))out[dn]=v})});
+  return out;
+}
+function mapRain(i,lead,k){var m=S.map&&S.map[i]&&S.map[i].daily;return m&&m[k]?m[k][lead]:null}
+function drawPredMap(){
+  var el=$('pmap');if(!el)return;var lead=S.pLead||0,by=predByDistrict(lead);
+  $('pmLead').innerHTML=['Today','Tomorrow'].map(function(l,i){return '<button class="pill'+(lead===i?' on':'')+'" data-pl="'+i+'">'+l+'</button>'}).join('');
+  [].forEach.call($('pmLead').querySelectorAll('[data-pl]'),function(b){b.onclick=function(){S.pLead=+b.dataset.pl;drawPredMap()}});
+  if(!by){el.innerHTML='<p class="muted">Available after the first morning run.</p>';return}
+  var wide=cw(el,520)>=520,sel=S.pSel!=null?S.pSel:S.gDis.indexOf('D:')===0?S.dist:null;
+  var s='<svg viewBox="0 0 '+BVW+' '+BVH+'" width="100%" role="img" aria-label="Predicted risk across Bihar districts">',cent={},drops='';
+  D.forEach(function(d,i){var v=by[d[0]],r=mapRain(i,lead,'precipitation_sum'),p=bmPt(i);
+    if(v)(cent[v.c]=cent[v.c]||[]).push(p);
+    s+='<path data-pd="'+i+'" d="'+bmPath(i)+'" fill="'+(v?RISKC[v.risk]:'#cbd5e1')+'" fill-opacity="'+(v&&v.risk!=='Normal'?.88:.5)+'" stroke="#fff" stroke-width="1.6" style="cursor:pointer">'+
+      '<title>'+d[0]+(v?' · '+v.c+': '+v.risk+', '+hm(v.opf)+' per feeder, '+f0(v.sc)+' complaints':'')+(r!=null?' · rain '+r.toFixed(1)+' mm':'')+'</title></path>';
+    if(r!=null&&r>=1)drops+='<circle cx="'+p[0]+'" cy="'+(p[1]-(wide?16:0))+'" r="'+Math.min(26,7+Math.sqrt(r)*3)+'" fill="#3b9cf0" fill-opacity=".8" stroke="#fff" stroke-width="2" style="pointer-events:none"/>'});
+  s+='<path d="'+BMAP.cl+'" fill="none" stroke="#334155" stroke-width="2.6" style="pointer-events:none"/>';
+  s+='<path d="'+BMAP.ol+'" fill="none" stroke="#334155" stroke-width="3" style="pointer-events:none"/>'+drops;
+  if(sel!=null)s+='<path d="'+bmPath(sel)+'" fill="none" stroke="#0f1b2d" stroke-width="5" style="pointer-events:none"/>';
+  /* label high and medium circles once, at the centre of their districts; other district names in small type */
+  var items=Object.keys(cent).map(function(c){var v=null;Object.keys(by).forEach(function(k){if(by[k].c===c&&(!v||RISKN[by[k].risk]>RISKN[v.risk]))v=by[k]});return {c:c,v:v,p:cent[c]}})
+    .filter(function(o){return o.v&&o.v.risk!=='Normal'}).sort(function(a,b){return RISKN[b.v.risk]-RISKN[a.v.risk]||b.v.opf-a.v.opf})
+    .map(function(o){var cx=o.p.reduce(function(a,q){return a+q[0]},0)/o.p.length,cy=o.p.reduce(function(a,q){return a+q[1]},0)/o.p.length;
+      return {x:cx,y:cy+8,txt:o.c+' '+hm(o.v.opf),size:wide?22:30,weight:700,fill:o.v.risk==='High'?'#8f2018':'#6b4700'}});
+  if(wide)D.forEach(function(d,i){var p=bmPt(i);items.push({x:p[0],y:p[1]+(by[d[0]]&&mapRain(i,lead,'precipitation_sum')>=1?22:6),txt:d[0],size:15,weight:500,fill:'#1e293b'})});
+  s+=bmLabels(items);
+  el.innerHTML=s+'</svg>';
+  [].forEach.call(el.querySelectorAll('[data-pd]'),function(g){g.onclick=function(){S.pSel=+g.dataset.pd;drawPredMap()}});
+  /* detail */
+  var i=S.pSel!=null?S.pSel:S.gDis.indexOf('D:')===0?S.dist:D.findIndex(function(d){var v=by[d[0]];return v&&v.risk==='High'});if(i<0)i=S.dist;
+  var d=D[i],v=by[d[0]],r=mapRain(i,lead,'precipitation_sum'),pp=mapRain(i,lead,'precipitation_probability_max'),g=mapRain(i,lead,'wind_gusts_10m_max');
+  var P=S.G.prediction,gc=v?S.G.circles.find(function(o){return o.c===v.c})||{}:{};
+  $('pmDet').innerHTML='<div class="pmh"><b>'+d[0]+'</b>'+(v?'<span class="st '+(v.risk==='High'?'b':v.risk==='Medium'?'w':'n')+'"><i></i>'+v.risk+' risk</span>':'')+'</div>'+
+    (v?'<div class="muted" style="margin-bottom:8px">'+v.c+' circle · '+v.dc+' · '+(lead?'tomorrow':'today')+', '+dlong(P.targets[lead])+'</div>'+
+      '<div class="pmg"><div><span>Avg outage per feeder</span><b>'+hm(v.opf)+'</b><small>likely '+hm(v.lo)+'–'+hm(v.hi)+' · normal '+hm(gc.nOpf)+'</small></div>'+
+      '<div><span>Supply complaints</span><b>'+f0(v.sc)+'</b><small>likely '+f0(v.scLo)+'–'+f0(v.scHi)+' · normal '+f0(gc.nSc)+'</small></div>'+
+      '<div><span>Forecast rain</span><b>'+(r==null?'–':r.toFixed(1)+' mm')+'</b><small>'+(pp!=null?pp+'% chance':'')+(gc.thr?' · circle limit '+gc.thr+' mm':'')+'</small></div>'+
+      '<div><span>Max gusts</span><b>'+(g==null?'–':Math.round(g)+' km/h')+'</b><small>alert at '+S.G.cfg.gust+' km/h</small></div></div>'
+     :'<p class="muted">No prediction for this district'+(S.gDis!=='All'?' in '+scopeName():'')+'.</p>')+
+    '<p class="note">Tap any district. Colour shows the predicted risk of its circle and blue dots show forecast rain. Patna district has three circles (Patna, PESU East, PESU West); the highest risk is shown.</p>';
+}
+
+/* ===== PDF report ===== */
+var LIBS=['https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js','https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js'];
+function loadScript(u){return new Promise(function(ok,no){var s=document.createElement('script');s.src=u;s.onload=ok;s.onerror=no;document.head.appendChild(s)})}
+function toast(html,ms){var t=$('toast');t.innerHTML=html;t.classList.add('on');clearTimeout(t._h);if(ms)t._h=setTimeout(function(){t.classList.remove('on')},ms)}
+function rgb(h){var n=parseInt(h.slice(1),16);return [n>>16,(n>>8)&255,n&255]}
+function exportPdf(){
+  var b=$('pdfBtn');if(b.disabled)return;b.disabled=true;toast('Preparing the PDF report…');
+  (window.jspdf&&window.jspdf.jsPDF&&window.jspdf.jsPDF.API.autoTable?Promise.resolve():loadScript(LIBS[0]).then(function(){return loadScript(LIBS[1])}))
+  .then(function(){var doc=buildReport();var name='Bihar-Grid-Weather-'+(S.G&&S.gSel?S.gSel:new Date().toISOString().slice(0,10))+(S.gDis!=='All'?'-'+S.gDis.replace('D:',''):'')+'.pdf';
+    var url=null;try{url=doc.output('bloburl')}catch(e){}
+    try{doc.save(name)}catch(e){}
+    toast('PDF ready.'+(url?' If it did not download, <a href="'+url+'" target="_blank" rel="noopener">open it here</a>.':''),15000)})
+  .catch(function(){toast('Could not create the PDF. Please check the connection and try again.',8000)})
+  .then(function(){b.disabled=false});
+}
+function buildReport(){
+  var J=window.jspdf.jsPDF,doc=new J({orientation:'landscape',unit:'mm',format:'a4'}),PW=297,PH=210,M=12;
+  var INK=rgb('#0f1b2d'),MUT=rgb('#5b6b80'),LINE=rgb('#e5eaf1'),ACC=rgb('#1b4fa3');
+  var scope=scopeName(),gen=new Date().toLocaleString('en-IN',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  var hasG=!gridMissing(),A=hasG?agg(S.gDis):[],sel=hasG?Math.max(0,S.G.dates.indexOf(S.gSel)):0,pa=hasG?predAgg(S.gDis):null;
+  var page=function(title,sub){doc.setFillColor.apply(doc,ACC);doc.rect(0,0,PW,16,'F');doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(13);doc.text('Bihar Grid & Weather Report',M,10.5);
+    doc.setFont('helvetica','normal');doc.setFontSize(9);doc.text(scope+(hasG?' · '+dlab(A[0].d)+' to '+dlab(A[A.length-1].d):'')+' · generated '+gen,PW-M,10.5,{align:'right'});
+    doc.setTextColor.apply(doc,INK);doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text(title,M,25);if(sub){doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor.apply(doc,MUT);doc.text(sub,M,30)}};
+  var kpi=function(x,y,w,label,val,sub,col){doc.setDrawColor.apply(doc,LINE);doc.setFillColor(255,255,255);doc.roundedRect(x,y,w,22,2,2,'FD');doc.setFillColor.apply(doc,rgb(col));doc.rect(x,y,1.3,22,'F');
+    doc.setFont('helvetica','normal');doc.setFontSize(7.8);doc.setTextColor.apply(doc,MUT);doc.text(label,x+4,y+5.5);doc.setFont('helvetica','bold');doc.setFontSize(15);doc.setTextColor.apply(doc,INK);doc.text(val,x+4,y+13.5);
+    doc.setFont('helvetica','normal');doc.setFontSize(7.8);doc.setTextColor.apply(doc,MUT);doc.text(sub,x+4,y+19)};
+  var xs=function(v){return v==null||isNaN(v)?'':v.toFixed(1)+'×'};
+  /* aligned panel chart */
+  var panel=function(x,y,w,h,title,vals,col,fmt,normal,type){
+    doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor.apply(doc,INK);doc.text(title,x,y-3.5);
+    var pl=16,cw_=w-pl,n=vals.length,mx=Math.max.apply(null,vals.map(function(v){return v||0}).concat([normal||0]))*1.12||1,bw=cw_/n;
+    var Y=function(v){return y+h-(v||0)/mx*h};
+    doc.setDrawColor.apply(doc,LINE);doc.setLineWidth(.2);doc.setFont('helvetica','normal');doc.setFontSize(6.5);doc.setTextColor.apply(doc,MUT);
+    for(var k=0;k<=2;k++){var v=mx*k/2,yy=Y(v);doc.line(x+pl,yy,x+w,yy);doc.text(fmt(v),x+pl-1.5,yy+1,{align:'right'})}
+    doc.setFillColor(27,79,163);doc.setGState&&doc.setGState(new doc.GState({opacity:.07}));doc.rect(x+pl+bw*sel,y,bw,h,'F');doc.setGState&&doc.setGState(new doc.GState({opacity:1}));
+    var c=rgb(col);
+    if(type==='bar'){vals.forEach(function(v,i){if(v==null)return;var bh=(v||0)/mx*h;doc.setFillColor.apply(doc,i===sel?c:c.map(function(q){return Math.round(q+(255-q)*.45)}));doc.rect(x+pl+bw*i+bw*.18,y+h-bh,bw*.64,bh,'F')})}
+    else{doc.setDrawColor.apply(doc,c);doc.setLineWidth(.7);var pv=null;vals.forEach(function(v,i){if(v==null){pv=null;return}var px=x+pl+bw*i+bw/2,py=Y(v);if(pv)doc.line(pv[0],pv[1],px,py);pv=[px,py]});
+      vals.forEach(function(v,i){if(v==null)return;doc.setFillColor(255,255,255);doc.setDrawColor.apply(doc,c);doc.setLineWidth(.5);doc.circle(x+pl+bw*i+bw/2,Y(v),i===sel?1.2:.8,'FD')})}
+    if(normal){doc.setDrawColor(148,163,184);doc.setLineWidth(.3);doc.setLineDashPattern([1,1],0);doc.line(x+pl,Y(normal),x+w,Y(normal));doc.setLineDashPattern([],0);doc.setFontSize(6);doc.setTextColor(148,163,184);doc.text('normal',x+w,Y(normal)-.8,{align:'right'})}
+    doc.setLineWidth(.2);
+  };
+  /* combined chart, same as the dashboard: rain bars (left, mm), outage and complaints as × normal lines (right) */
+  var combo=function(x,y,w,h){
+    var n=A.length;if(!n)return;
+    var lg=[['Rain mm (left)','#3b9cf0','bar'],['Avg outage per feeder, × normal (right)','#f08a24','line'],['Supply complaints, × normal (right)','#7c4dff','line']],lx=x;
+    doc.setFont('helvetica','normal');doc.setFontSize(7.8);
+    lg.forEach(function(l){var c=rgb(l[1]);doc.setFillColor.apply(doc,l[2]==='bar'?c.map(function(q){return Math.round(q+(255-q)*.45)}):c);
+      if(l[2]==='bar')doc.roundedRect(lx,y-6.2,5,3,.6,.6,'F');else doc.rect(lx,y-5.2,5,1,'F');
+      doc.setTextColor.apply(doc,MUT);doc.text(l[0],lx+6.5,y-3.9);lx+=6.5+doc.getTextWidth(l[0])+8});
+    var pl=12,pr=14,pb=8,cw2=w-pl-pr,ch2=h-pb,bw=cw2/n,X=function(i){return x+pl+bw*i+bw/2};
+    var maxR=Math.max(5,Math.max.apply(null,A.map(function(a){return a.rain||0}))),maxX=Math.max(2,Math.max.apply(null,A.map(function(a){return Math.max(a.ro||0,a.rc||0)})));
+    var stp=[1,2,5,10,15,20,25,50,100].find(function(v){return v*4>=maxR})||Math.ceil(maxR/4);maxR=stp*4;
+    var sx=[0.5,1,1.5,2,2.5,5].find(function(v){return v*4>=maxX})||Math.ceil(maxX/4);maxX=sx*4;
+    var yR=function(v){return y+(1-v/maxR)*ch2},yX=function(v){return y+(1-v/maxX)*ch2};
+    doc.setFontSize(6.8);doc.setLineWidth(.2);
+    for(var k=0;k<=4;k++){var vy=y+k*ch2/4;doc.setDrawColor(238,242,247);doc.line(x+pl,vy,x+w-pr,vy);doc.setTextColor(148,163,184);
+      doc.text(String(Math.round(maxR*(1-k/4))),x+pl-1.5,vy+1,{align:'right'});doc.text((maxX*(1-k/4)).toFixed(1)+'×',x+w-pr+1.5,vy+1)}
+    doc.setFillColor(27,79,163);doc.setGState&&doc.setGState(new doc.GState({opacity:.07}));doc.roundedRect(X(sel)-bw/2,y,bw,ch2,1.5,1.5,'F');doc.setGState&&doc.setGState(new doc.GState({opacity:1}));
+    var rc=rgb('#3b9cf0');
+    A.forEach(function(a,i){var y0=yR(a.rain||0),bh=y+ch2-y0;if(bh<=0)return;doc.setFillColor.apply(doc,i===sel?rc.map(function(q){return Math.round(q+(255-q)*.15)}):rc.map(function(q){return Math.round(q+(255-q)*.58)}));doc.roundedRect(X(i)-bw*.3,y0,bw*.6,bh,.8,.8,'F')});
+    doc.setDrawColor(148,163,184);doc.setLineWidth(.3);doc.setLineDashPattern([1.2,1.2],0);doc.line(x+pl,yX(1),x+w-pr,yX(1));doc.setLineDashPattern([],0);
+    doc.setFontSize(6.5);doc.setTextColor(148,163,184);doc.text('normal',x+w-pr-1,yX(1)-1,{align:'right'});
+    [['ro','#f08a24'],['rc','#7c4dff']].forEach(function(L){var c=rgb(L[1]),pv=null;doc.setDrawColor.apply(doc,c);doc.setLineWidth(.8);
+      A.forEach(function(a,i){if(a[L[0]]==null){pv=null;return}var pt=[X(i),yX(a[L[0]])];if(pv)doc.line(pv[0],pv[1],pt[0],pt[1]);pv=pt});
+      A.forEach(function(a,i){if(a[L[0]]==null)return;doc.setFillColor(255,255,255);doc.setDrawColor.apply(doc,c);doc.setLineWidth(.55);doc.circle(X(i),yX(a[L[0]]),i===sel?1.3:.85,'FD')})});
+    var step=Math.max(1,Math.ceil(n/16));doc.setFontSize(6.8);
+    A.forEach(function(a,i){if(i===sel||(i%step===0&&(step===1||Math.abs(i-sel)>=Math.max(2,step)))){doc.setFont('helvetica',i===sel?'bold':'normal');doc.setTextColor.apply(doc,i===sel?INK:[148,163,184]);doc.text(dlab(a.d),X(i),y+ch2+5,{align:'center'})}});
+    doc.setFont('helvetica','normal');doc.setLineWidth(.2);
+  };
+  var tableStyle={theme:'grid',styles:{font:'helvetica',fontSize:7.6,cellPadding:1.6,lineColor:LINE,lineWidth:.15,textColor:INK},headStyles:{fillColor:[241,246,254],textColor:INK,fontStyle:'bold',fontSize:7.4},alternateRowStyles:{fillColor:[250,251,253]},margin:{left:M,right:M,top:34,bottom:14}};
+  var xCell=function(data,col){if(data.section!=='body'||data.column.index!==col)return;var v=parseFloat(data.cell.raw);if(isNaN(v))return;
+    data.cell.styles.textColor=v>=1.8?[194,56,44]:v>=1.3?[154,100,0]:[23,128,74];data.cell.styles.fontStyle='bold'};
+
+  if(hasG){
+    var y=A[sel];
+    page('Summary · '+dlong(y.d),'Avg outage per feeder = total outage minutes ÷ total feeders. × compares with the normal level. Rain is a model estimate averaged over the circles.');
+    var w=(PW-2*M-3*4)/4;
+    kpi(M,34,w,'Avg outage per feeder · '+dlong(y.d),hm(y.opf)+' h:mm',xs(y.ro)+' of normal '+hm(y.nopf),'#f08a24');
+    kpi(M+w+4,34,w,'Supply complaints · '+dlong(y.d),f0(y.sc),xs(y.rc)+' of normal '+f0(y.nsc),'#7c4dff');
+    kpi(M+2*(w+4),34,w,'Rain · '+dlong(y.d),y.rain.toFixed(1)+' mm',(y.gust!=null?'max gust '+Math.round(y.gust)+' km/h · ':'')+y.o4+' feeders over 4 h','#3b9cf0');
+    var p0=pa&&pa.a[0];
+    kpi(M+3*(w+4),34,w,'Predicted '+(pa?dlong(pa.t[0]):'today'),p0?hm(p0.opf)+' h:mm · '+f0(p0.sc):'Not yet',p0?'likely '+hm(p0.lo)+'–'+hm(p0.hi)+' per feeder, '+f0(p0.scLo)+'–'+f0(p0.scHi)+' calls':'After the first morning run','#1b4fa3');
+    combo(M,66,PW-2*M,114);
+    var r=pear(A.filter(function(a){return a.sc!=null}).map(function(a){return a.opf}),A.filter(function(a){return a.sc!=null}).map(function(a){return a.sc}));
+    var r2=pear(A.slice(1).map(function(a,i){return Math.max(a.rain,A[i].rain)}),A.slice(1).map(function(a){return a.opf||0}));
+    doc.setFontSize(8);doc.setTextColor.apply(doc,INK);
+    doc.text('How closely they move together over this period: outages and complaints '+(r==null?'–':r.toFixed(2))+' · rain (that day or the day before) and outages '+(r2==null?'–':r2.toFixed(2))+'. A value near 1 means they rise and fall together.',M,PH-16);
+
+    doc.addPage();page('Day by day','Weather, avg outage per feeder and supply complaints side by side.');
+    doc.autoTable(Object.assign({},tableStyle,{startY:34,
+      head:[['Date','Rain mm','Max gust km/h','Avg outage per feeder','× normal','Feeders over 4 h','Supply complaints','× normal','Circles beyond weather','Circles weather-driven']],
+      body:A.map(function(a){var cnt=countSt(a.d);return [dlong(a.d),a.rain.toFixed(1),a.gust==null?'–':Math.round(a.gust),hm(a.opf),xs(a.ro),f0(a.o4),f0(a.sc),xs(a.rc),cnt.B,cnt.W]}),
+      columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'},7:{halign:'right'},8:{halign:'right'},9:{halign:'right'}},
+      didParseCell:function(d){xCell(d,4);xCell(d,7);if(d.section==='body'&&d.row.index===sel)d.cell.styles.fillColor=[234,242,253]}}));
+
+    doc.addPage();page('Circles · '+dlong(y.d)+(p0?' and prediction for '+dlong(pa.t[0]):''),'Status compares each circle with its own normal. Weather-driven: big rise with heavy rain or strong gusts. Beyond weather: big rise without it.');
+    var prev=S.G.dates[sel-1],P=S.G.prediction,stx={W:'Weather-driven',B:'Beyond weather',N:'Normal'};
+    var rows=S.G.circles.filter(function(o){return inScope(o.c,o.dc)}).map(function(o){var x=o.d[y.d];if(!x)return null;var pp=prev&&o.d[prev]?o.d[prev][6]:null,pc=P&&P.circles&&P.circles[o.c],p=pc&&pc.p[0];
+      return {k:{B:0,W:1,N:2}[x[10]],imp:Math.max(x[8]||0,x[9]||0),r:[o.c,o.dc,(x[6]==null?'–':x[6].toFixed(1))+' · '+(pp==null?'–':pp.toFixed(1)),hm(x[0]?x[3]/x[0]:null),xs(x[8]),f0(x[5]),xs(x[9]),stx[x[10]],p&&pc.tf?hm(p[0]/pc.tf):'–',p?f0(p[3]):'–',p?p[6]:'–']}}).filter(Boolean)
+      .sort(function(a,b){return a.k-b.k||b.imp-a.imp}).map(function(z){return z.r});
+    doc.autoTable(Object.assign({},tableStyle,{startY:34,
+      head:[['Circle','Discom','Rain mm day · prev','Avg outage per feeder','× normal','Supply complaints','× normal','Status','Predicted avg outage','Predicted complaints','Risk']],body:rows,
+      columnStyles:{2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'},8:{halign:'right'},9:{halign:'right'}},
+      didParseCell:function(d){xCell(d,4);xCell(d,6);if(d.section!=='body')return;var v=d.cell.raw;
+        if(d.column.index===7||d.column.index===10){var c=v==='Beyond weather'||v==='High'?[194,56,44]:v==='Weather-driven'||v==='Medium'?[154,100,0]:[23,128,74];d.cell.styles.textColor=c;d.cell.styles.fontStyle='bold'}}}));
+  }
+  /* prediction map */
+  var by=hasG?predByDistrict(0):null;
+  if(by&&Object.keys(by).length){
+    doc.addPage();page('Prediction map · '+dlong(pa.t[0]),'Districts coloured by the predicted risk of their circle; thick lines are circle boundaries, blue dots show forecast rain.');
+    var mx0=M,my0=34,mw=170,mh=150,pd=4,sc=Math.min((mw-2*pd)/BVW,(mh-2*pd-8)/BVH),ox=mx0+(mw-BVW*sc)/2,oy=my0+pd;
+    doc.setFillColor(247,249,252);doc.setDrawColor.apply(doc,LINE);doc.roundedRect(mx0,my0,mw,mh,3,3,'FD');
+    var ops=function(d){var o=[];d.split('M').forEach(function(seg){if(!seg)return;var cl=seg.indexOf('Z')>-1,pts=seg.replace('Z','').trim().split(' ');
+      pts.forEach(function(pq,k){var q=pq.split(',');o.push({op:k?'l':'m',c:[ox+(+q[0])*sc,oy+(+q[1])*sc]})});if(cl)o.push({op:'h',c:[]})});return o};
+    D.forEach(function(d,i){var v=by[d[0]],c=rgb(v?RISKC[v.risk]:'#cbd5e1');if(!v||v.risk==='Normal')c=c.map(function(q){return Math.round(q+(255-q)*.45)});
+      doc.setFillColor.apply(doc,c);doc.setDrawColor(255,255,255);doc.setLineWidth(.25);doc.path(ops(bmPath(i)));doc.fillStroke()});
+    doc.setDrawColor(51,65,85);doc.setLineWidth(.45);doc.path(ops(BMAP.cl));doc.stroke();doc.setLineWidth(.55);doc.path(ops(BMAP.ol));doc.stroke();
+    D.forEach(function(d,i){var r=mapRain(i,0,'precipitation_sum'),p=bmPt(i);
+      if(r!=null&&r>=1){doc.setFillColor(59,156,240);doc.setDrawColor(255,255,255);doc.setLineWidth(.3);doc.circle(ox+p[0]*sc,oy+(p[1]-14)*sc,Math.min(3.2,1+Math.sqrt(r)*.4),'FD')}
+      doc.setFont('helvetica','normal');doc.setFontSize(5.4);doc.setTextColor(30,41,59);doc.text(d[0],ox+p[0]*sc,oy+p[1]*sc+1.6,{align:'center'})});
+    var lx=mx0+4,ly=my0+mh-4;[['High','#df4b3f'],['Medium','#e3a21a'],['Normal','#22a35a']].forEach(function(k,i){doc.setFillColor.apply(doc,rgb(k[1]));doc.circle(lx+i*22+1.5,ly-1,1.5,'F');doc.setFontSize(7);doc.setTextColor.apply(doc,INK);doc.text(k[0],lx+i*22+4.5,ly)});
+    var cl=Object.keys(S.G.prediction.circles).filter(function(c){var o=S.G.prediction.circles[c];return inScope(c,o.dc)&&o.p[0]&&o.tf}).map(function(c){var o=S.G.prediction.circles[c],p=o.p[0],t=o.p[1];
+      return {k:RISKN[p[6]],v:p[0]/o.tf,r:[c,p[6],hm(p[0]/o.tf),hm(p[1]/o.tf)+'–'+hm(p[2]/o.tf),f0(p[3]),t?t[6]:'–']}}).sort(function(a,b){return b.k-a.k||b.v-a.v}).map(function(z){return z.r});
+    doc.autoTable(Object.assign({},tableStyle,{startY:34,margin:{left:M+176,right:M,top:34,bottom:14},
+      head:[['Circle','Risk','Avg outage','Likely','Calls','Tmrw']],body:cl,styles:Object.assign({},tableStyle.styles,{fontSize:7}),
+      didParseCell:function(d){if(d.section!=='body'||(d.column.index!==1&&d.column.index!==5))return;var v=d.cell.raw;d.cell.styles.textColor=v==='High'?[194,56,44]:v==='Medium'?[154,100,0]:[23,128,74];d.cell.styles.fontStyle='bold'}}));
+  }
+  /* weather outlook */
+  if(S.wx){
+    doc.addPage();page('Weather outlook · '+D[S.dist][0],'Combined from 6 forecast models (ECMWF, GFS, ICON, UK Met Office, Météo-France, JMA). For official warnings follow IMD Patna.');
+    doc.autoTable(Object.assign({},tableStyle,{startY:34,tableWidth:150,
+      head:[['Day','Sky','Low','High','Rain mm','Models expecting rain','Agreement']],
+      body:S.wx.map(function(d){return [dlong(d.date),sky(d.code),deg(d.lo),deg(d.hi),d.rain==null?'–':d.rain.toFixed(1),d.wet+' of '+d.n,CONF[d.conf][0]]}),
+      columnStyles:{2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'}}}));
+    var wxEnd=doc.lastAutoTable.finalY,wxPage=doc.getNumberOfPages();
+    if(S.map){
+      var lst=D.map(function(d,i){var m=S.map[i]&&S.map[i].daily;return m?[d[0],m.precipitation_sum[0],m.precipitation_probability_max[0],m.wind_gusts_10m_max[0],m.precipitation_sum[1],m.wind_gusts_10m_max[1]]:null}).filter(Boolean)
+        .sort(function(a,b){return Math.max(b[1]||0,b[4]||0)-Math.max(a[1]||0,a[4]||0)}).slice(0,15);
+      doc.autoTable(Object.assign({},tableStyle,{startY:34,margin:{left:M+156,right:M,top:34,bottom:14},
+        head:[['District (wettest 15)','Rain today mm','Chance','Gust today','Rain tomorrow mm','Gust tomorrow']],
+        body:lst.map(function(r){return [r[0],r[1]==null?'–':r[1].toFixed(1),r[2]==null?'–':r[2]+'%',r[3]==null?'–':Math.round(r[3]),r[4]==null?'–':r[4].toFixed(1),r[5]==null?'–':Math.round(r[5])]}),
+        columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'}}}));
+    }
+    if(hasG&&S.G.risk&&S.G.risk.length){doc.setPage(wxPage);var ry=wxEnd+8;var seen={},rk=[];S.G.risk.forEach(function(r){if(!seen[r.c]&&inScope(r.c,r.dc)){seen[r.c]=1;rk.push(r)}});rk=rk.slice(0,14);
+      if(rk.length){doc.autoTable(Object.assign({},tableStyle,{startY:ry,pageBreak:'avoid',tableWidth:150,margin:{left:M,right:M,top:34,bottom:14},
+        head:[['Circles at risk in the next 48 hours','Day','Rain mm','Circle limit mm','Gust km/h']],
+        body:rk.map(function(r){return [r.c+' ('+r.dc+')',dlong(r.date),r.rain==null?'–':Math.round(r.rain),r.thr,r.gust==null?'–':Math.round(r.gust)]})}))}}
+  }
+  var np=doc.getNumberOfPages();
+  for(var i=1;i<=np;i++){doc.setPage(i);doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor.apply(doc,MUT);
+    doc.text('Outage data: Daily Outage Analytics (SBPDCL, NBPDCL). Complaints: 1912 call centre, supply related. Weather: Open-Meteo forecast models.',M,PH-6);doc.text('Page '+i+' of '+np,PW-M,PH-6,{align:'right'})}
+  return doc;
+}
+function countSt(d){var c={B:0,W:0,N:0};S.G.circles.forEach(function(o){if(!inScope(o.c,o.dc))return;var x=o.d[d];if(x)c[x[10]]++});return c}
+
+/* ===== Start ===== */
+var rt,lw=window.innerWidth;window.addEventListener('resize',function(){if(window.innerWidth===lw)return;lw=window.innerWidth;clearTimeout(rt);rt=setTimeout(renderAll,200)});
+renderAll();loadWeather();loadGrid();
+setInterval(loadWeather,15*60*1000);   // live weather every 15 minutes
+setInterval(loadGrid,30*60*1000);      // grid figures every 30 minutes
+})();
+</script>
+</body>
+</html>

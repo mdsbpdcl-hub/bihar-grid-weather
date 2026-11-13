@@ -1,0 +1,695 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bihar Grid &amp; Weather Dashboard: Technical Explainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f6fb;--card:#ffffff;--ink:#0f1b2d;--muted:#5b6b80;--faint:#94a3b8;--line:#e3e8f0;--soft:#f7f9fc;
+  --acc:#1d4ed8;--acc2:#0e7490;--accs:#e8efff;--amber:#b45309;--ambs:#fff4e0;--red:#b91c1c;--reds:#fdecec;--green:#15803d;--greens:#e8f6ee;
+  --rain:#3b9cf0;--out:#f08a24;--cmp:#7c4dff;--code:#0b1220;--codeink:#dbe4f3;
+  --d:#1d4ed8;--b:#0e7490;
+}
+[data-theme=dark]{
+  --bg:#0b1220;--card:#121b2d;--ink:#e6edf7;--muted:#9fb0c6;--faint:#6b7c93;--line:#22304a;--soft:#0f1828;
+  --acc:#7aa2ff;--acc2:#38bdf8;--accs:#18264a;--amber:#fbbf24;--ambs:#2d2310;--red:#f87171;--reds:#331616;--green:#4ade80;--greens:#0f2a1c;
+  --code:#060b16;--codeink:#dbe4f3;--d:#7aa2ff;--b:#38bdf8;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:16px}
+body{margin:0;background:var(--bg);color:var(--ink);font:15.5px/1.65 'IBM Plex Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+h1,h2,h3,h4{font-family:Outfit,system-ui,sans-serif;line-height:1.25;margin:0}
+h1{font-size:clamp(26px,4vw,38px);font-weight:700;letter-spacing:-.01em}
+h2{font-size:clamp(22px,2.6vw,28px);font-weight:700;margin-bottom:6px}
+h3{font-size:18px;font-weight:600;margin:22px 0 8px}
+h4{font-size:15.5px;font-weight:600;margin:14px 0 6px}
+p{margin:8px 0}
+a{color:var(--acc)}
+code,.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:.88em}
+code{background:var(--soft);border:1px solid var(--line);border-radius:5px;padding:1px 5px;word-break:break-word}
+pre{background:var(--code);color:var(--codeink);border-radius:10px;padding:14px 16px;overflow-x:auto;font:13px/1.6 'IBM Plex Mono',monospace;margin:10px 0}
+pre code{background:none;border:0;padding:0;color:inherit;font-size:inherit}
+.c-k{color:#7aa2ff}.c-s{color:#86efac}.c-c{color:#8b9bb4}.c-n{color:#fbbf24}
+
+/* layout */
+.wrap{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh}
+.rail{position:sticky;top:0;height:100vh;overflow-y:auto;background:var(--card);border-right:1px solid var(--line);padding:20px 14px}
+.rail .brand{font-family:Outfit,system-ui,sans-serif;font-weight:700;font-size:16px;margin:0 6px 4px}
+.rail .sub{font-size:12px;color:var(--muted);margin:0 6px 14px}
+.rail nav a{display:flex;gap:8px;align-items:center;padding:7px 10px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:14px;font-weight:500}
+.rail nav a .n{font:500 11px 'IBM Plex Mono',ui-monospace,monospace;color:var(--faint);width:18px}
+.rail nav a:hover{background:var(--soft);color:var(--ink)}
+.rail nav a.on{background:var(--accs);color:var(--acc)}
+.rail nav a.on .n{color:var(--acc)}
+.tbtn{margin:14px 6px 0;width:calc(100% - 12px);border:1px solid var(--line);background:var(--soft);color:var(--ink);border-radius:8px;padding:8px;font:500 13px 'IBM Plex Sans',system-ui,sans-serif;cursor:pointer}
+.strip{display:none}
+main{padding:28px clamp(16px,4vw,48px) 60px;max-width:1120px;width:100%}
+section{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:clamp(18px,3vw,30px);margin-bottom:22px}
+.kick{font:600 12px 'IBM Plex Sans',system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--acc2);margin-bottom:6px}
+.lead{font-size:16.5px;color:var(--muted);max-width:820px}
+.hero{background:linear-gradient(135deg,#0f2a6b,#1d4ed8 55%,#0e7490);color:#fff;border:0}
+.hero .kick{color:#a5d8ff}.hero .lead{color:#dbe7ff}
+.legend-dt{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:14px;font-size:13px;color:#dbe7ff}
+.tg{display:inline-flex;align-items:center;justify-content:center;font:600 10.5px 'IBM Plex Mono',ui-monospace,monospace;border-radius:4px;padding:0 5px;height:17px;vertical-align:1px;margin-left:4px;border:1px solid}
+.tg.d{color:var(--d);border-color:var(--d)}.tg.b{color:var(--b);border-color:var(--b)}
+.hero .tg{color:#fff;border-color:#fff}
+
+/* components */
+.grid{display:grid;gap:12px}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.kpi{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);border-radius:12px;padding:12px 14px}
+.kpi .v{font:700 26px Outfit,system-ui,sans-serif}.kpi .l{font-size:12.5px;color:#dbe7ff}
+.card{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.card h4{margin-top:0}
+.note{background:var(--accs);border-left:3px solid var(--acc);border-radius:8px;padding:10px 14px;margin:12px 0;font-size:14.5px}
+.warn{background:var(--ambs);border-left:3px solid var(--amber);border-radius:8px;padding:10px 14px;margin:12px 0;font-size:14.5px}
+.tw{overflow-x:auto;margin:10px 0;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--soft);font-weight:600;font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+.pill{display:inline-block;font-size:12px;font-weight:600;border-radius:999px;padding:1px 9px}
+.p-b{background:var(--reds);color:var(--red)}.p-w{background:var(--ambs);color:var(--amber)}.p-n{background:var(--greens);color:var(--green)}
+.steps{counter-reset:s;display:grid;gap:10px;margin:12px 0}
+.step{display:grid;grid-template-columns:38px minmax(0,1fr);gap:12px;align-items:start;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.step:before{counter-increment:s;content:counter(s);display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:var(--acc);color:#fff;font:600 14px Outfit,system-ui,sans-serif}
+.step b{font-family:Outfit,system-ui,sans-serif;font-weight:600;font-size:15.5px}
+.step .fn{font:500 12px 'IBM Plex Mono',ui-monospace,monospace;color:var(--acc2)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:5px 12px;font:500 13px 'IBM Plex Sans',system-ui,sans-serif;cursor:pointer}
+.chip.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.svgbox{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:10px;margin:12px 0}
+.svgbox svg{display:block;width:100%;height:auto}
+.cap{font-size:12.5px;color:var(--muted);margin-top:6px}
+.calc{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:16px;margin-top:12px}
+.sl{margin:10px 0}
+.sl label{display:flex;justify-content:space-between;font-size:14px;font-weight:500}
+.sl label span{font:500 13px 'IBM Plex Mono',ui-monospace,monospace;color:var(--acc)}
+input[type=range]{width:100%;accent-color:var(--acc)}
+.out{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.out .big{font:700 34px Outfit,system-ui,sans-serif;line-height:1.1}
+.out .row{display:flex;justify-content:space-between;font-size:13.5px;border-bottom:1px dashed var(--line);padding:5px 0}
+.out .row:last-child{border:0}
+.srch{width:100%;max-width:360px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:8px 12px;font:14px 'IBM Plex Sans',system-ui,sans-serif}
+.exhead{display:flex;flex-wrap:wrap;gap:10px 22px;align-items:baseline;margin:6px 0 10px}
+.exhead .t{font:700 22px Outfit,system-ui,sans-serif}
+.mini{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:10px 0}
+.mini div{background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.mini span{display:block;font-size:12px;color:var(--muted)}.mini b{font:600 19px Outfit,system-ui,sans-serif}
+.obs{display:grid;gap:12px}
+.ob{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.ob .ic{font:700 22px Outfit,system-ui,sans-serif;color:var(--acc)}
+dl.gl{display:grid;grid-template-columns:200px minmax(0,1fr);gap:0;margin:8px 0;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+dl.gl dt,dl.gl dd{margin:0;padding:8px 12px;border-bottom:1px solid var(--line)}
+dl.gl dt{font-weight:600;background:var(--soft)}
+ol.refs li{margin:6px 0}
+.dom{color:var(--muted);font-size:12.5px}
+footer{color:var(--muted);font-size:12.5px;text-align:center;padding:10px}
+
+@media (max-width:900px){
+  .wrap{display:block}
+  .rail{display:none}
+  .strip{display:flex;position:sticky;top:0;z-index:5;gap:4px;overflow-x:auto;background:var(--card);border-bottom:1px solid var(--line);padding:8px 10px;scrollbar-width:none}
+  .strip::-webkit-scrollbar{display:none}
+  .strip a{flex:0 0 auto;padding:6px 11px;border-radius:999px;font-size:13px;font-weight:500;color:var(--muted);text-decoration:none;border:1px solid var(--line)}
+  .strip a.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+  .strip button{flex:0 0 auto;border:1px solid var(--line);background:var(--soft);color:var(--ink);border-radius:999px;padding:6px 10px;font-size:13px}
+  html{scroll-padding-top:58px}
+  .g4,.mini{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .g3,.g2,.calc{grid-template-columns:minmax(0,1fr)}
+  dl.gl{grid-template-columns:minmax(0,1fr)}
+  dl.gl dt{border-bottom:0;padding-bottom:2px}
+  main{padding:16px 12px 40px}
+  table{font-size:13px}
+  .tw table{min-width:560px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<aside class="rail">
+  <div class="brand">Bihar Grid &amp; Weather</div>
+  <div class="sub">Technical Explainer · 1 Nov 2026</div>
+  <nav id="rail"></nav>
+  <button class="tbtn" id="tb1">Dark Theme</button>
+</aside>
+<div>
+<div class="strip" id="strip"></div>
+<main>
+
+<!-- 1 OVERVIEW -->
+<section class="hero" id="overview" data-t="Overview">
+  <div class="kick">Technical Explainer</div>
+  <h1>Bihar Grid &amp; Weather Dashboard</h1>
+  <p class="lead">A Google Apps Script system that joins circle-level outages from the Daily Outage Analytics sheet and supply complaints from the 1912 call centre with weather for all 38 districts. It flags circles hit beyond normal, predicts today's and tomorrow's outages and complaints, emails a morning alert and serves an interactive web page with a PDF report.</p>
+  <div class="grid g4" style="margin-top:18px">
+    <div class="kpi"><div class="v">20</div><div class="l">Circles (11 SBPDCL, 9 NBPDCL)</div></div>
+    <div class="kpi"><div class="v">38</div><div class="l">District weather points</div></div>
+    <div class="kpi"><div class="v">5,385</div><div class="l">11 kV feeders tracked</div></div>
+    <div class="kpi"><div class="v">6</div><div class="l">Forecast models on the page</div></div>
+    <div class="kpi"><div class="v">9 AM</div><div class="l">Daily run, IST</div></div>
+    <div class="kpi"><div class="v">2 days</div><div class="l">Prediction horizon</div></div>
+    <div class="kpi"><div class="v">13</div><div class="l">Tabs in the main sheet</div></div>
+    <div class="kpi"><div class="v">~1,770</div><div class="l">Lines of code (Code.gs + Index.html)</div></div>
+  </div>
+  <div class="legend-dt"><span><span class="tg d">D</span> From the code, sheets or feed</span><span><span class="tg b">B</span> Background added for understanding</span><span>Figures as of the 31 Oct 2026 data day</span></div>
+</section>
+
+<!-- 2 ARCHITECTURE -->
+<section id="architecture" data-t="Architecture">
+  <div class="kick">How the Pieces Fit</div>
+  <h2>System Architecture</h2>
+  <p class="lead">Three inputs, one script, four outputs. Everything lives in Google's cloud: no server, database or paid service.</p>
+  <div class="svgbox"><svg viewBox="0 0 960 470" role="img" aria-label="System architecture diagram" id="arch"></svg></div>
+  <p>The script <b>Code.gs</b> is bound to the <b>Bihar Grid Weather Archive</b> sheet (the main sheet). Every morning a time trigger runs <code>runDaily()</code>, which reads the two source sheets (read only), fetches weather, works out status and predictions, writes everything to the main sheet and the Drive folder, and emails the alert. <span class="tg d">D</span></p>
+  <p>The page <b>Index.html</b> is served by the same project as a web app. It gets the grid figures through <code>google.script.run.getFeed()</code> and fetches weather straight from Open-Meteo in the browser, so live weather never waits on the script. <span class="tg d">D</span></p>
+  <div class="note"><b>Apps Script</b> is Google's JavaScript runtime attached to Sheets, Drive and Gmail. A <b>trigger</b> runs a function on a schedule; a <b>web app</b> deployment gives a URL that runs <code>doGet()</code> and returns a page or data. <span class="tg b">B</span></div>
+</section>
+
+<!-- 3 DATA SOURCES -->
+<section id="sources" data-t="Data Sources">
+  <div class="kick">Inputs</div>
+  <h2>Data Sources</h2>
+  <div class="tw"><table>
+    <tr><th>Source</th><th>What Is Read</th><th>How</th><th>Used For</th></tr>
+    <tr><td><b>Daily Outage Analytics – Bihar</b></td><td><code>Weather Link</code> tab (A–K) and <code>SBPDCL / NBPDCL History Divisions</code></td><td>Opened by ID, read only</td><td>Circle and division outages; complaints via Weather Link <span class="tg d">D</span></td></tr>
+    <tr><td><b>Customer Call Center – 1912</b></td><td>Supply Related complaints (fed into Weather Link column K); <code>DB_DAILY</code>, <code>DB_META</code> for the check</td><td>Through Weather Link; opened by ID for the daily check</td><td>Supply complaints; cross-check <span class="tg d">D</span></td></tr>
+    <tr><td><b>Open-Meteo (server)</b></td><td>Daily rain, max gust, max temperature for 38 district points; 3 past days + 3 forecast days (92 past days at setup)</td><td><code>UrlFetchApp</code>, one call for all 38 points, default best-match model</td><td>Weather History, Forecast, status, prediction, 48 h risk <span class="tg d">D</span></td></tr>
+    <tr><td><b>Open-Meteo (page)</b></td><td>7-day forecast from 6 named models; current conditions and hourly; 2-day rain map for all districts</td><td>Browser <code>fetch()</code>, 3 calls per district pick</td><td>Weather tab, Weather Now, rain map, PDF outlook <span class="tg d">D</span></td></tr>
+  </table></div>
+  <h3>Weather Link Columns</h3>
+  <p>This tab in the outage sheet is the bridge between outages and complaints. One row per circle per day, for the 14 days that the 1912 sheet has circle-level complaints. <span class="tg d">D</span></p>
+  <div class="tw"><table>
+    <tr><th>Col</th><th>Field</th><th>Meaning</th></tr>
+    <tr><td>A</td><td>Date</td><td>Outage day (yyyy-mm-dd)</td></tr>
+    <tr><td>B</td><td>Day No</td><td>Sheets serial date (46326 = 31 Oct 2026); used if the date cell is unreadable</td></tr>
+    <tr><td>C–D</td><td>Discom, Circle</td><td>Circle name as in the outage sheet (e.g. ARRAH)</td></tr>
+    <tr><td>E</td><td>Complaint Circle</td><td>Name in the 1912 system (ARA, NALANDA, GAYA …)</td></tr>
+    <tr><td>F</td><td>Total Feeders</td><td>11 kV feeders in the circle used for averages</td></tr>
+    <tr><td>G</td><td>Feeders With Outage</td><td>Feeders with at least one interruption that day</td></tr>
+    <tr><td>H</td><td>Interruptions</td><td>Count of interruption events</td></tr>
+    <tr><td>I</td><td>Outage Min</td><td>Total outage minutes across all feeders</td></tr>
+    <tr><td>J</td><td>Feeders Over 4 Hrs</td><td>Feeders off for more than 4 hours in the day</td></tr>
+    <tr><td>K</td><td>Supply Complaints</td><td>1912 complaints of category "Supply Related" received that day</td></tr>
+  </table></div>
+  <div class="note">Verified on 1 Nov: every circle-day outage total equals the sum of its divisions, and the Weather Link complaint totals equal the 1912 sheet's Supply Related figures for SBPDCL and NBPDCL on all 14 days. <span class="tg d">D</span></div>
+  <h3>Circle to District Map</h3>
+  <p>Weather is fetched per district and rolled up to circles: <b>rain = average</b> of the circle's districts, <b>gust = maximum</b>, <b>temperature = maximum</b>. Patna district serves three circles (Patna, PESU East, PESU West). <span class="tg d">D</span></p>
+  <div class="tw"><table id="cdmap"></table></div>
+</section>
+
+<!-- 4 DAILY RUN -->
+<section id="daily" data-t="Daily Run">
+  <div class="kick">Process Lifecycle</div>
+  <h2>Daily Run</h2>
+  <p class="lead"><code>runDaily()</code> fires once a day between 9 and 10 AM IST, after both source sheets refresh. Each step runs inside <code>step_()</code>, so one failure is logged and the rest still run. <span class="tg d">D</span></p>
+  <div class="steps">
+    <div class="step"><div><b>Source Check</b> <span class="fn">checkSources_()</span><br>Confirms yesterday's outage data has arrived for all 20 circles, circle totals equal the division sums, and complaints match the 1912 sheet. Problems go to the Run Log and a red line at the top of the email.</div></div>
+    <div class="step"><div><b>Weather</b> <span class="fn">updateWeather_(3)</span><br>One Open-Meteo call for 38 districts. Past days go to <i>Weather History</i> (upsert by date + circle); today and the next two days replace <i>Weather Forecast</i>.</div></div>
+    <div class="step"><div><b>Grid Archive</b> <span class="fn">archiveGrid_()</span><br>Copies Weather Link rows into <i>Grid History</i>. Days older than Weather Link's 14 are filled from division totals with complaints left blank; an earlier complaint figure is never overwritten by a blank.</div></div>
+    <div class="step"><div><b>Division Archive</b> <span class="fn">archiveDivisions_()</span><br>Copies both History Divisions tabs into <i>Division History</i> (key: date + discom + circle + division).</div></div>
+    <div class="step"><div><b>Thresholds</b> <span class="fn">computeThresholds_()</span><br>Works out each circle's normal and, once 30 days of history exist, learns its own rain limit. Writes <i>Circle Thresholds</i>.</div></div>
+    <div class="step"><div><b>Prediction</b> <span class="fn">predict_()</span><br>Refits the model on all history, predicts the next two days per circle, writes <i>Model</i> and <i>Predictions</i>, then fills in actuals for earlier predictions.</div></div>
+    <div class="step"><div><b>Drive Archive</b> <span class="fn">archiveToDrive_(false)</span><br>Re-saves the last 3 days to the archive tabs and writes one JSON file per day under <code>JSON/yyyy/yyyy-mm/</code> in the WeatherPrediction folder.</div></div>
+    <div class="step"><div><b>Cache Clear</b><br>Removes the cached feed so the page shows the new figures at once.</div></div>
+    <div class="step"><div><b>Alert</b> <span class="fn">sendAlert_()</span><br>Emails the summary: data check, prediction for today, circles beyond weather, weather-driven circles and circles at risk in the next 48 hours.</div></div>
+  </div>
+  <h3>Setup</h3>
+  <p><code>setup()</code> is run once by hand. It creates all tabs, copies any history the old script kept in the outage sheet, backfills 92 days of weather, runs every step once, saves the full Drive archive and creates the 9 AM trigger (deleting any older one). Running it again is safe. <span class="tg d">D</span></p>
+</section>
+
+<!-- 5 WEATHER -->
+<section id="weather" data-t="Weather Models">
+  <div class="kick">Weather</div>
+  <h2>Weather Models</h2>
+  <h3>Server Weather</h3>
+  <p>The script uses Open-Meteo's default <b>best match</b>, which picks the most suitable model for each location. Multiple points go in one request as comma-separated latitude and longitude lists, and the reply becomes a list with one entry per point. <span class="tg b">B</span> The script reads <code>precipitation_sum</code>, <code>wind_gusts_10m_max</code> and <code>temperature_2m_max</code> per day. <span class="tg d">D</span></p>
+  <h3>Page Weather: Six-Model Consensus</h3>
+  <p>The Weather tab asks for the same 7 days from six global models at once and shows the consensus, so the reader sees how sure the forecast is. <span class="tg d">D</span></p>
+  <div class="tw"><table>
+    <tr><th>Model</th><th>Model Id</th><th>Run By</th></tr>
+    <tr><td>ECMWF IFS</td><td><code>ecmwf_ifs025</code></td><td>European Centre for Medium-Range Weather Forecasts</td></tr>
+    <tr><td>GFS</td><td><code>gfs_seamless</code></td><td>NOAA, USA</td></tr>
+    <tr><td>ICON</td><td><code>icon_seamless</code></td><td>DWD, Germany</td></tr>
+    <tr><td>UK Met Office</td><td><code>ukmo_seamless</code></td><td>United Kingdom</td></tr>
+    <tr><td>Météo-France</td><td><code>meteofrance_seamless</code></td><td>France</td></tr>
+    <tr><td>JMA</td><td><code>jma_seamless</code></td><td>Japan</td></tr>
+  </table></div>
+  <h4>Consensus Rules</h4>
+  <div class="tw"><table>
+    <tr><th>Item</th><th>Rule in <code>parseModels()</code></th></tr>
+    <tr><td>Day value</td><td>Median across models that returned data (high, low, rain, wind); weather icon is the middle code</td></tr>
+    <tr><td>Wet model</td><td>A model forecasting 1 mm or more; card shows "x of n models"</td></tr>
+    <tr><td>Split</td><td>Between 25% and 75% of models are wet</td></tr>
+    <tr><td>Confidence High</td><td>Spread of highs ≤ 2.5 °C and not split</td></tr>
+    <tr><td>Confidence Medium</td><td>Spread ≤ 4.5 °C</td></tr>
+    <tr><td>Confidence Low</td><td>Otherwise: "Check IMD before acting"</td></tr>
+    <tr><td>Outlier</td><td>A model whose high is more than 2.5 °C from the median is marked</td></tr>
+  </table></div>
+  <p>Some models run fewer than 7 days. A model with no value for a day is left out of that day's median, so later days may show "5 of 5 models". This is expected, not a fault. <span class="tg d">D</span> To confirm all six are live, run <code>checkWeatherModels()</code>; it logs one line per model with days returned for each variable.</p>
+  <div class="warn">Rain figures are <b>model estimates</b>, averaged over each circle's districts, not rain-gauge readings. The page forecast (six-model median) and the script's risk list (best match) can differ slightly. For warnings follow IMD Patna. <span class="tg d">D</span></div>
+</section>
+
+<!-- 6 STATUS -->
+<section id="status" data-t="Circle Status">
+  <div class="kick">Core Logic</div>
+  <h2>Circle Status</h2>
+  <p class="lead">Every circle-day gets one of three labels by comparing the circle with <b>its own normal</b>, so a rural circle and PESU West can be judged on the same scale. <span class="tg d">D</span></p>
+  <div class="grid g3">
+    <div class="card"><h4><span class="pill p-b">Beyond Weather</span></h4>Outages or complaints at 1.8× normal or more <b>without</b> heavy rain or strong gusts. Check the network.</div>
+    <div class="card"><h4><span class="pill p-w">Weather-Driven</span></h4>The same rise <b>with</b> rain at or above the circle's limit (that day or the day before) or gusts of 45 km/h or more.</div>
+    <div class="card"><h4><span class="pill p-n">Normal</span></h4>Both measures below 1.8× normal.</div>
+  </div>
+  <h3>Calculation</h3>
+<pre><code><span class="c-c">// status_(): one circle, one day</span>
+normalOut  = median(outage min per feeder, 28 days either side, excluding the day)
+normalCmp  = median(complaints, same window)
+ro = outage per feeder ÷ normalOut      rc = complaints ÷ normalCmp
+rain = max(rain that day, rain day before)
+stress = rain ≥ circle limit  <span class="c-k">OR</span>  gust ≥ <span class="c-n">45</span>
+status = max(ro, rc) ≥ <span class="c-n">1.8</span> ? (stress ? <span class="c-s">'W'</span> : <span class="c-s">'B'</span>) : <span class="c-s">'N'</span></code></pre>
+  <h3>Rain Limit Learning</h3>
+  <p>Each circle starts on <b>15 mm</b>. After 30 days of grid history, <code>computeThresholds_()</code> takes its dry-day normal (days where rain that day and the day before was under 5 mm), groups rainy days into bands of 5, 15, 25, 40 and 60 mm, and picks the <b>lowest band</b> where at least 3 days had a median outage of 1.8× normal or more. That becomes the circle's own limit, marked "Learned". <span class="tg d">D</span></p>
+  <div class="note">A weak network shows up as a lower learned limit: a circle that trips at 5 mm will be flagged at risk for lighter forecast rain than one that holds up to 25 mm.</div>
+</section>
+
+<!-- 7 PREDICTION -->
+<section id="prediction" data-t="Prediction Model">
+  <div class="kick">Forecasting</div>
+  <h2>Prediction Model</h2>
+  <p class="lead">A statistical regression, not a language model or neural network. Every morning it learns from all past circle-days how weather and yesterday's level move a circle away from its normal, then applies that to the forecast. <span class="tg d">D</span></p>
+  <h3>Features</h3>
+  <div class="tw"><table>
+    <tr><th>Feature</th><th>Value Used</th><th>Effect Allowed</th></tr>
+    <tr><td>Intercept</td><td>1</td><td>Any</td></tr>
+    <tr><td>Rain Today</td><td>ln(1 + mm)</td><td>Up only</td></tr>
+    <tr><td>Rain Yesterday</td><td>ln(1 + mm)</td><td>Up only</td></tr>
+    <tr><td>Rain 2 Days Ago</td><td>ln(1 + mm)</td><td>Up only</td></tr>
+    <tr><td>Gust Above 30 km/h</td><td>(gust − 30) ÷ 10, floor 0</td><td>Up only</td></tr>
+    <tr><td>Heat Above 35 °C</td><td>(max temp − 35) ÷ 3, floor 0</td><td>Up only</td></tr>
+    <tr><td>Sunday</td><td>1 or 0</td><td>Any</td></tr>
+    <tr><td>Yesterday Level</td><td>Yesterday's log-ratio to normal</td><td>Any</td></tr>
+  </table></div>
+  <h3>Method</h3>
+  <p><b>Target.</b> The model predicts the <i>level</i>: ln(value ÷ normal), where normal is the circle's median over the last 60 days (dry days if at least 7). Level 0 is a normal day; ln 2 ≈ 0.69 is double. Logs turn multiplying effects into adding ones. <span class="tg d">D</span></p>
+  <p><b>Fitting.</b> <code>ridge_()</code> solves least squares with a small penalty (λ = 1) on every weight except the intercept, by Gaussian elimination with partial pivoting. All 20 circles are pooled, so the model has 20 examples per day of history. <span class="tg d">D</span> Ridge regression shrinks weights toward zero, which keeps them steady when examples are few and features move together, as rain on consecutive days does. <span class="tg b">B</span></p>
+  <p><b>Safeguards.</b> <code>fitModel_()</code> refits with any negative weather weight set to zero, most negative first, because rain, gusts and heat cannot reduce outages. Below 40 training rows the script skips the model and assumes half of yesterday's excess carries over. <span class="tg d">D</span></p>
+  <p><b>Range.</b> The residual spread (floor 0.15) gives an 80% band: level ± 1.2816 × spread. Tomorrow's band is 25% wider. Statewide totals add circle bands in quadrature (square root of the sum of squares). <span class="tg d">D</span></p>
+  <p><b>Risk.</b> High at 1.8× normal or more, Medium at 1.3×, otherwise Normal. <b>Scoring:</b> next morning each prediction gets its actual figure and an "in range" Yes/No; the page's track record uses the last 30 days. <span class="tg d">D</span></p>
+  <h3>Prediction Calculator</h3>
+  <p>Weights fitted on history to 31 Oct (outage model). The script refits every morning; the <i>Model</i> tab holds the current values. <span class="tg d">D</span></p>
+  <div class="calc">
+    <div>
+      <div class="sl"><label>Forecast rain today <span id="v_r">0 mm</span></label><input type="range" id="i_r" min="0" max="80" step="1" value="20"></div>
+      <div class="sl"><label>Max gust <span id="v_g">30 km/h</span></label><input type="range" id="i_g" min="10" max="80" step="1" value="30"></div>
+      <div class="sl"><label>Yesterday, × normal <span id="v_y">1.0×</span></label><input type="range" id="i_y" min="0.3" max="5" step="0.1" value="1"></div>
+      <div class="sl"><label style="justify-content:flex-start;gap:8px"><input type="checkbox" id="i_s"> Sunday</label></div>
+      <div class="sl"><label>Circle</label><select id="i_c" class="srch" style="max-width:100%"></select></div>
+    </div>
+    <div class="out" id="calcOut"></div>
+  </div>
+  <div class="warn">The model sees only weather, Sunday and yesterday's level. Planned shutdowns, upstream grid trips, festival load and feeder condition are invisible to it, so a day like 21 Oct (2.4× the calm-day level with no rain) will be missed and correctly marked Beyond Weather. The page shows "Learning" until about 60 days of history.</div>
+</section>
+
+<!-- 8 SHEETS -->
+<section id="sheets" data-t="Sheets & Tabs">
+  <div class="kick">Storage</div>
+  <h2>Sheets &amp; Tabs</h2>
+  <p class="lead">The main sheet holds eight working tabs the script maintains and five archive tabs meant for people. All writes go through <code>upsert_()</code>: rows are matched by their key columns, replaced if present, added if new, duplicates collapsed and the tab kept sorted. <span class="tg d">D</span></p>
+  <div class="tw"><table id="tabsT"></table></div>
+  <h3>Drive Archive</h3>
+  <p>Folder <b>WeatherPrediction</b> → <code>JSON/2026/2026-10/2026-10-31.json</code>: one fixed record per day with circles, divisions, and for the latest day the forecast and predictions as issued. Only the latest file is overwritten on a normal run. <span class="tg d">D</span></p>
+</section>
+
+<!-- 9 FEED -->
+<section id="feed" data-t="Web App & Feed">
+  <div class="kick">Delivery</div>
+  <h2>Web App &amp; Feed</h2>
+  <div class="tw"><table>
+    <tr><th>Request</th><th>Function</th><th>Returns</th></tr>
+    <tr><td>Web app URL, no parameters</td><td><code>doGet()</code></td><td>Index.html via HtmlService, with title and mobile viewport</td></tr>
+    <tr><td>URL <code>?days=14</code></td><td><code>doGet()</code> → <code>feedJson_()</code></td><td>The JSON feed (for other tools)</td></tr>
+    <tr><td>Page call</td><td><code>google.script.run.getFeed(14)</code></td><td>The same JSON as text</td></tr>
+  </table></div>
+  <p><code>buildData_(days)</code> assembles the feed from the working tabs. It is cached for 10 minutes when under 95,000 characters <span class="tg d">D</span>, because a cached value can hold at most 100 KB and a 600-second expiry is the default. <span class="tg b">B</span> The 14-day feed is about 55 KB.</p>
+  <h3>Feed Structure</h3>
+<pre><code>{ ok, generated, asOf:<span class="c-s">"2026-10-31"</span>, from, dates:[…14 days],
+  cfg:{ impactX:<span class="c-n">1.8</span>, gust:<span class="c-n">45</span>, defaultRain:<span class="c-n">15</span> },
+  circles:[{ c:<span class="c-s">"ARRAH"</span>, dc:<span class="c-s">"SBPDCL"</span>, thr, basis, nOpf, nSc,
+             d:{ <span class="c-s">"2026-10-31"</span>:[ tf, fo, itr, om, o4, sc, rain, gust, ro, rc, st ] } }],
+  divisions:{ date:[[discom, circle, division, tf, fo, itr, om, o4]] },   <span class="c-c">// last 7 days</span>
+  forecast:{ circle:{ date:[rain, gust] } },  risk:[{ c, date, rain, gust, thr }],
+  prediction:{ targets, totals, circles:{ c:{ tf, p:[[om, lo, hi, sc, lo, hi, risk], …] } },
+               track, hist, learning, historyDays } }</code></pre>
+  <div class="tw"><table>
+    <tr><th>Index</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th></tr>
+    <tr><td>Field</td><td>Total feeders</td><td>Feeders with outage</td><td>Interruptions</td><td>Outage min</td><td>Feeders over 4 h</td><td>Supply complaints</td><td>Rain mm</td><td>Gust km/h</td><td>Outage × normal</td><td>Complaints × normal</td><td>Status</td></tr>
+  </table></div>
+</section>
+
+<!-- 10 PAGE -->
+<section id="page" data-t="Page Code">
+  <div class="kick">Front End</div>
+  <h2>Page Code</h2>
+  <p class="lead">Index.html is one file: HTML layout, CSS and plain JavaScript, with no framework. Charts and maps are SVG strings built in code; the PDF uses jsPDF and its table plug-in, loaded from a CDN only when Export PDF is pressed. <span class="tg d">D</span></p>
+  <div class="grid g2">
+    <div class="card"><h4>State</h4>One object <code>S</code> holds the tab, district, scope (<code>gDis</code>), days, selected day, weather and feed. Every change calls <code>renderAll()</code>, which redraws only the active tab.</div>
+    <div class="card"><h4>Scope</h4><code>inScope(circle, discom)</code> decides what every view includes: Bihar, SBPDCL, NBPDCL or <code>D:&lt;district&gt;</code> (the circles covering that district).</div>
+    <div class="card"><h4>District Pick</h4><code>pickDist()</code> sets the district scope and loads its weather; <code>pickAll()</code> returns to All Districts. A request counter ignores a slow reply for an earlier pick.</div>
+    <div class="card"><h4>Memory</h4>The last district is kept in browser storage, inside try/catch, so the page opens where it was left.</div>
+  </div>
+  <h3>Tabs</h3>
+  <div class="tw"><table>
+    <tr><th>Tab</th><th>Render</th><th>Shows</th></tr>
+    <tr><td>Overview</td><td><code>renderOverview()</code></td><td>Four KPI tiles, combined chart (rain bars, outage and complaints × normal), Needs Attention list, Weather Now or Weather Across Bihar</td></tr>
+    <tr><td>Weather</td><td><code>renderWeather()</code></td><td>Current conditions, next 24 hours, rain map of 38 districts, 7-day consensus, temperature band across models, model comparison, IMD links</td></tr>
+    <tr><td>Grid vs Weather</td><td><code>renderGrid()</code></td><td>Daily trend, rain-against-outage scatter with correlation, circle table with divisions on tap</td></tr>
+    <tr><td>Prediction</td><td><code>renderPred()</code></td><td>Predicted totals, risk map by district, district detail, predicted against actual, track record</td></tr>
+  </table></div>
+  <h3>Combined Chart</h3>
+  <p><code>comboChart()</code> draws two scales on one chart: rain bars on the left in mm, and outage and complaints as lines on the right in multiples of normal, with a dashed line at 1×. Axis steps are chosen so four grid lines land on round numbers. The PDF draws the same chart with jsPDF shapes in <code>buildReport()</code>. <span class="tg d">D</span></p>
+</section>
+
+<!-- 11 EXPLORER -->
+<section id="explorer" data-t="Explorer">
+  <div class="kick">Interactive</div>
+  <h2>Circle Explorer</h2>
+  <p class="lead">Pick a circle to see its 14 days as the dashboard sees them, and its divisions on 31 Oct. <span class="tg d">D</span></p>
+  <div class="chips" id="exChips"></div>
+  <div id="exBody"></div>
+</section>
+
+<!-- 12 SAFEGUARDS -->
+<section id="safeguards" data-t="Safeguards">
+  <div class="kick">Reliability</div>
+  <h2>Safeguards</h2>
+  <div class="tw"><table>
+    <tr><th>Safeguard</th><th>Where</th><th>Protects Against</th></tr>
+    <tr><td>Step isolation</td><td><code>step_()</code></td><td>One failed step stopping the whole run; every step logs OK or Error with a message</td></tr>
+    <tr><td>Source check</td><td><code>checkSources_()</code></td><td>Late, partial or mismatched source data reaching the alert unnoticed</td></tr>
+    <tr><td>Model check</td><td><code>checkWeatherModels()</code></td><td>A weather model silently returning nothing</td></tr>
+    <tr><td>Upsert with dedupe</td><td><code>upsert_()</code></td><td>Duplicate rows when Sheets turns date text into dates</td></tr>
+    <tr><td>Keep if blank</td><td><code>upsert_(…, keepIfBlank)</code></td><td>A blank complaint figure wiping a known one; actuals on predictions</td></tr>
+    <tr><td>Weather only adds</td><td><code>fitModel_()</code></td><td>The model learning that rain lowers outages from one storm's recovery day</td></tr>
+    <tr><td>Fallback estimate</td><td><code>predict_()</code></td><td>Unstable weights with under 40 training rows</td></tr>
+    <tr><td>Two source sheets read only</td><td><code>src_()</code></td><td>The script altering the outage sheet</td></tr>
+    <tr><td>Run Log cap</td><td><code>log_()</code></td><td>The log tab growing without end (trimmed at 600 rows)</td></tr>
+    <tr><td>Reply ordering</td><td><code>loadWeather()</code></td><td>An earlier district's weather showing under a later pick</td></tr>
+  </table></div>
+  <h3>Limits &amp; Quotas</h3>
+  <div class="tw"><table>
+    <tr><th>Limit</th><th>Value</th><th>This System</th></tr>
+    <tr><td>Script runtime</td><td>6 min per execution <span class="tg b">B</span></td><td>Daily run takes about 1–2 minutes; full setup about 2</td></tr>
+    <tr><td>Trigger runtime</td><td>90 min/day on a gmail.com account, 6 h on Workspace <span class="tg b">B</span></td><td>One run a day</td></tr>
+    <tr><td>URL Fetch calls</td><td>20,000/day consumer <span class="tg b">B</span></td><td>1–2 a day from the script</td></tr>
+    <tr><td>Cache value</td><td>100 KB per key <span class="tg b">B</span></td><td>Feed cached only if under 95,000 characters</td></tr>
+    <tr><td>Open-Meteo free API</td><td>Under 10,000 calls a day, non-commercial use <span class="tg b">B</span></td><td>3 calls per district pick per viewer, plus the script</td></tr>
+  </table></div>
+</section>
+
+<!-- 13 CODE MAP -->
+<section id="codemap" data-t="Code Map">
+  <div class="kick">Reference</div>
+  <h2>Code Map</h2>
+  <p class="lead">Every function in both files, grouped by job. Type to filter. <span class="tg d">D</span></p>
+  <input class="srch" id="cmq" placeholder="Filter functions, e.g. weather, upsert">
+  <div class="tw"><table id="cmT"></table></div>
+  <h3>Configuration</h3>
+  <p>All tunable values sit in the <code>CFG</code> object at the top of Code.gs. <span class="tg d">D</span></p>
+  <div class="tw"><table id="cfgT"></table></div>
+</section>
+
+<!-- 14 KNOWN GAPS -->
+<section id="gaps" data-t="Known Gaps">
+  <div class="kick">Discrepancies</div>
+  <h2>Known Gaps</h2>
+  <div class="obs">
+    <div class="ob"><div class="ic">1</div><div><b>Two Different Normals.</b> Status and the circle table use a rolling 28-day median of all days (<code>status_</code>); KPI tiles, chart ratios and predictions use a 60-day median of dry days (<code>normals_</code>). On 31 Oct, with Gaya selected, the Overview tile read 1.8× while the circle table showed Gaya Ji at 1.4×. Both are valid; they answer slightly different questions. <span class="tg d">D</span></div></div>
+    <div class="ob"><div class="ic">2</div><div><b>Status of Older Days Shifts.</b> The 28-day window looks both ways, so a past day's ratio changes as later days arrive. The Drive JSON for each day is frozen once it falls out of the 3-day redo window. <span class="tg d">D</span></div></div>
+    <div class="ob"><div class="ic">3</div><div><b>Complaints for 14 Days Only.</b> Weather Link covers the 14 days the 1912 sheet has by circle. Earlier grid days (13–17 Oct) have outages but no complaints, so the complaint model trains on fewer rows. <span class="tg d">D</span></div></div>
+    <div class="ob"><div class="ic">4</div><div><b>History Days Is Approximate.</b> The "Learning · n days" badge is training rows ÷ 20 circles, not a calendar count. <span class="tg d">D</span></div></div>
+    <div class="ob"><div class="ic">5</div><div><b>Late Source Data.</b> If the outage sheet has not refreshed by the run, "today" is predicted from the day before yesterday. The Source Check now flags this in the email. <span class="tg d">D</span></div></div>
+    <div class="ob"><div class="ic">6</div><div><b>One-District Weather Detail.</b> With All Districts selected, the Weather tab's detailed forecast stays on the last district picked (Patna to start); the rain map and Overview card cover all of Bihar. <span class="tg d">D</span></div></div>
+  </div>
+</section>
+
+<!-- 15 TRENDS -->
+<section id="trends" data-t="Trends">
+  <div class="kick">Evidence</div>
+  <h2>Trends</h2>
+  <p class="lead">Statewide figures, 18–31 Oct 2026, drawn to scale. Bars: total outage hours; line: supply complaints; blue figures under the bars: average rain across circles. <span class="tg d">D</span></p>
+  <div class="svgbox"><svg viewBox="0 0 900 316" id="trendSvg" role="img" aria-label="Statewide outage hours, complaints and rain by day"></svg></div>
+  <div class="obs" id="obs"></div>
+</section>
+
+<!-- 16 PERSPECTIVE -->
+<section id="perspective" data-t="Perspective">
+  <div class="kick">For SBPDCL and NBPDCL</div>
+  <h2>Perspective</h2>
+  <div class="tw"><table>
+    <tr><th>Action</th><th>Why</th><th>When</th></tr>
+    <tr><td><b>Let history build</b></td><td>Circle rain limits start learning at 30 days of grid history (from 13 Oct, around 12 Nov); the Learning badge clears near 60 days</td><td>No action; review mid-Nov</td></tr>
+    <tr><td><b>Review every Beyond Weather day</b></td><td>These are the network's own failures; 21–22 Oct is the first case to explain (10 and 7 circles, no rain)</td><td>Each morning from the email</td></tr>
+    <tr><td><b>Add recipients</b></td><td>Put SEs and the CGM (O&amp;M) in <code>CFG.RECIPIENTS</code> so the alert reaches field offices</td><td>Now</td></tr>
+    <tr><td><b>Tag non-weather causes</b></td><td>A simple column for planned shutdowns and BSPTCL grid trips would let the model and status set those days apart</td><td>Next version</td></tr>
+    <tr><td><b>Add observed rain</b></td><td>Bihar Mausam Sewa Kendra block stations would replace model estimates for past days</td><td>Next version</td></tr>
+    <tr><td><b>Festival and season flags</b></td><td>Load around Chhath, Diwali and heat waves moves outages without weather; a calendar flag would capture it</td><td>After 60 days</td></tr>
+    <tr><td><b>Keep a code copy</b></td><td>Store Code.gs and Index.html versions in Drive or GitHub before each change</td><td>Each change</td></tr>
+  </table></div>
+</section>
+
+<!-- 17 GLOSSARY -->
+<section id="glossary" data-t="Glossary">
+  <div class="kick">Terms</div>
+  <h2>Glossary</h2>
+  <dl class="gl" id="gl"></dl>
+</section>
+
+<!-- 18 REFERENCES -->
+<section id="references" data-t="References">
+  <div class="kick">Sources</div>
+  <h2>References</h2>
+  <h4>Online</h4>
+  <ol class="refs">
+    <li><a href="https://open-meteo.com/en/docs" target="_blank" rel="noopener">Open-Meteo Weather Forecast API documentation</a> <span class="dom">open-meteo.com</span></li>
+    <li><a href="https://open-meteo.com/en/docs/ecmwf-api" target="_blank" rel="noopener">Open-Meteo ECMWF API</a> <span class="dom">open-meteo.com</span></li>
+    <li><a href="https://open-meteo.com/en/terms" target="_blank" rel="noopener">Open-Meteo Terms &amp; Privacy</a> <span class="dom">open-meteo.com</span></li>
+    <li><a href="https://github.com/open-meteo/open-meteo" target="_blank" rel="noopener">Open-Meteo source repository</a> <span class="dom">github.com</span></li>
+    <li><a href="https://developers.google.com/apps-script/guides/services/quotas" target="_blank" rel="noopener">Quotas for Google Services (Apps Script)</a> <span class="dom">developers.google.com</span></li>
+    <li><a href="https://developers.google.com/apps-script/reference/cache/cache" target="_blank" rel="noopener">Class Cache (Apps Script)</a> <span class="dom">developers.google.com</span></li>
+    <li><a href="https://en.wikipedia.org/wiki/Ridge_regression" target="_blank" rel="noopener">Ridge regression</a> <span class="dom">wikipedia.org</span></li>
+    <li><a href="https://mausam.imd.gov.in/patna/" target="_blank" rel="noopener">IMD Meteorological Centre, Patna</a> <span class="dom">mausam.imd.gov.in</span></li>
+    <li><a href="https://mausamsewa.bihar.gov.in/" target="_blank" rel="noopener">Bihar Mausam Sewa Kendra</a> <span class="dom">mausamsewa.bihar.gov.in</span></li>
+  </ol>
+  <h4>Internal</h4>
+  <ol class="refs">
+    <li>Code.gs, Bihar Grid Weather Archive Apps Script project (1 Nov 2026 version)</li>
+    <li>Index.html, Bihar Grid &amp; Weather web page (1 Nov 2026 version)</li>
+    <li>Daily Outage Analytics – Bihar (Weather Link, History Divisions, Data Check tabs)</li>
+    <li>Customer Call Center – 1912 – Energy Department (DB_DAILY, DB_META, CC Import)</li>
+    <li>Grid feed JSON generated 1 Nov 2026 11:02, data to 31 Oct 2026</li>
+  </ol>
+</section>
+<footer>Bihar Grid &amp; Weather Dashboard · Technical Explainer · 1 Nov 2026</footer>
+</main>
+</div>
+</div>
+
+<script>
+var DATA={"circles":[{"c":"ARRAH","dc":"SBPDCL","dist":["Bhojpur","Buxar"],"nOpf":34.1,"nSc":65,"s":[["2026-10-18",237,155,547,5791,0,33,0.1,21,0.62,0.49,"N"],["2026-10-19",237,151,422,4452,1,35,0,23,0.47,0.51,"N"],["2026-10-20",237,153,445,5625,0,29,0,22,0.6,0.43,"N"],["2026-10-21",237,161,569,27720,57,135,0,16,3.38,2.01,"B"],["2026-10-22",237,161,560,12235,10,111,0,17,1.49,1.66,"N"],["2026-10-23",237,170,602,7231,1,43,0,20,0.77,0.63,"N"],["2026-10-24",237,172,641,9377,2,62,0,18,1.14,0.91,"N"],["2026-10-25",237,154,551,8208,1,65,0,15,0.88,0.96,"N"],["2026-10-26",237,159,587,8083,0,67,0,16,0.86,0.99,"N"],["2026-10-27",237,161,540,7723,3,68,0,15,0.82,1.01,"N"],["2026-10-28",237,167,598,11049,8,71,0,21,1.35,1.06,"N"],["2026-10-29",237,193,1563,36742,59,180,17.3,37,4.48,2.69,"W"],["2026-10-30",237,189,1902,59221,94,243,25.8,45,7.22,3.63,"W"],["2026-10-31",237,188,1219,21238,17,169,4,29,2.59,2.52,"W"]]},{"c":"AURANGABAD","dc":"SBPDCL","dist":["Aurangabad","Arwal"],"nOpf":27,"nSc":33,"s":[["2026-10-18",216,135,385,4829,2,30,0.1,19,0.68,0.83,"N"],["2026-10-19",216,129,356,4398,0,23,0,22,0.62,0.64,"N"],["2026-10-20",216,117,283,7769,6,17,0,20,1.27,0.47,"N"],["2026-10-21",216,132,395,16215,22,67,0,18,2.66,1.91,"B"],["2026-10-22",216,140,428,11062,8,53,0,18,1.81,1.51,"B"],["2026-10-23",216,132,402,5824,1,25,0,20,0.82,0.69,"N"],["2026-10-24",216,132,395,5100,0,44,0,20,0.72,1.26,"N"],["2026-10-25",216,136,391,5524,0,35,0,19,0.78,0.97,"N"],["2026-10-26",216,122,390,6100,1,33,0,19,0.86,0.92,"N"],["2026-10-27",216,123,332,5494,1,36,0,21,0.77,1.03,"N"],["2026-10-28",216,136,528,7116,0,30,3.3,20,1.17,0.83,"N"],["2026-10-29",216,157,1171,21764,27,90,19.8,32,3.57,2.57,"W"],["2026-10-30",216,166,1381,40738,57,146,28.5,47,6.68,4.17,"W"],["2026-10-31",216,149,744,16283,9,86,1.7,28,2.67,2.46,"W"]]},{"c":"BHAGALPUR","dc":"SBPDCL","dist":["Bhagalpur","Banka"],"nOpf":21.5,"nSc":127,"s":[["2026-10-18",251,164,408,3642,0,73,0,21,0.42,0.51,"N"],["2026-10-19",251,151,396,3548,1,67,0,23,0.41,0.47,"N"],["2026-10-20",251,102,180,1222,0,62,0,22,0.14,0.44,"N"],["2026-10-21",251,211,854,16067,18,162,0,18,2.96,1.17,"B"],["2026-10-22",251,206,814,21555,30,229,0,19,3.97,1.66,"B"],["2026-10-23",251,215,859,8583,3,138,0,22,1.58,0.97,"N"],["2026-10-24",251,210,870,12080,5,152,0,22,2.23,1.1,"B"],["2026-10-25",251,203,681,5390,0,89,0,21,0.63,0.63,"N"],["2026-10-26",251,160,411,4430,0,142,0,25,0.52,1.03,"N"],["2026-10-27",251,156,434,5427,0,127,0.1,23,0.63,0.89,"N"],["2026-10-28",251,155,457,5017,0,106,0.1,21,0.58,0.75,"N"],["2026-10-29",251,231,1876,30668,42,368,12.9,36,5.65,2.67,"B"],["2026-10-30",251,220,1270,16155,7,338,10.8,30,2.98,2.45,"B"],["2026-10-31",251,204,1017,11411,3,187,2.1,22,2.1,1.36,"B"]]},{"c":"BIHARSARIF","dc":"SBPDCL","dist":["Nalanda","Nawada","Sheikhpura"],"nOpf":33.1,"nSc":68,"s":[["2026-10-18",336,220,698,7548,0,50,0.1,19,0.55,0.57,"N"],["2026-10-19",336,221,714,7190,0,46,0,22,0.53,0.53,"N"],["2026-10-20",336,213,757,7565,0,57,0,23,0.56,0.66,"N"],["2026-10-21",336,239,848,22885,26,164,0,17,1.84,2.05,"B"],["2026-10-22",336,232,937,27944,26,99,0,18,2.24,1.24,"B"],["2026-10-23",336,244,863,13605,4,65,0,22,1.09,0.75,"N"],["2026-10-24",336,243,922,14966,12,97,0,22,1.2,1.21,"N"],["2026-10-25",336,221,743,10730,4,58,0,19,0.79,0.67,"N"],["2026-10-26",336,228,872,12449,4,80,0,18,0.91,0.92,"N"],["2026-10-27",336,228,741,10962,5,87,0,18,0.81,1.09,"N"],["2026-10-28",336,248,865,11115,2,68,1.9,19,0.82,0.78,"N"],["2026-10-29",336,254,1967,36257,50,223,16.3,33,2.91,2.79,"W"],["2026-10-30",336,253,2070,40109,61,264,25.1,38,3.22,3.3,"W"],["2026-10-31",336,241,1107,16147,3,178,8,26,1.3,2.23,"W"]]},{"c":"GAYA JI","dc":"SBPDCL","dist":["Gaya","Jehanabad"],"nOpf":26.4,"nSc":70,"s":[["2026-10-18",392,235,668,8581,4,51,0.1,19,0.66,0.67,"N"],["2026-10-19",392,230,643,9578,5,40,0,23,0.73,0.53,"N"],["2026-10-20",392,217,630,10027,1,48,0,23,0.77,0.63,"N"],["2026-10-21",392,253,736,21202,22,158,0,20,1.64,2.23,"B"],["2026-10-22",392,241,805,20051,23,117,0,17,1.55,1.65,"N"],["2026-10-23",392,257,871,15244,7,70,0,19,1.18,0.92,"N"],["2026-10-24",392,245,756,12947,6,71,0,23,0.99,0.93,"N"],["2026-10-25",392,239,602,10338,2,66,0,20,0.79,0.87,"N"],["2026-10-26",392,252,748,10248,2,43,0,21,0.78,0.57,"N"],["2026-10-27",392,236,646,9433,1,76,0,22,0.72,1.07,"N"],["2026-10-28",392,255,806,13077,8,80,3.8,19,1.01,1.13,"N"],["2026-10-29",392,306,2075,43725,59,152,16.7,33,3.38,2.14,"W"],["2026-10-30",392,314,2288,68986,117,279,36.3,47,5.33,3.93,"W"],["2026-10-31",392,275,1134,18190,7,149,2.8,27,1.4,2.1,"W"]]},{"c":"JAMUI","dc":"SBPDCL","dist":["Jamui","Lakhisarai"],"nOpf":11.2,"nSc":45,"s":[["2026-10-18",209,73,170,2337,1,38,0,19,0.5,0.81,"N"],["2026-10-19",209,75,175,1769,0,26,0,25,0.38,0.55,"N"],["2026-10-20",209,50,87,1021,0,11,0,23,0.22,0.23,"N"],["2026-10-21",209,97,262,4683,5,45,0,19,1.53,0.96,"N"],["2026-10-22",209,111,317,7267,6,63,0,19,2.37,1.37,"B"],["2026-10-23",209,118,356,4958,3,63,0,21,1.62,1.37,"N"],["2026-10-24",209,136,411,15995,30,99,0,22,5.22,2.15,"B"],["2026-10-25",209,111,270,3067,2,33,0,20,0.65,0.7,"N"],["2026-10-26",209,56,128,2194,3,46,0,23,0.47,0.98,"N"],["2026-10-27",209,66,124,1303,0,47,0.2,22,0.28,1.02,"N"],["2026-10-28",209,73,165,2036,0,41,0.3,17,0.43,0.87,"N"],["2026-10-29",209,134,966,22994,38,169,14.3,27,7.5,3.67,"B"],["2026-10-30",209,128,551,11567,10,97,13,31,3.77,2.11,"B"],["2026-10-31",209,115,505,7906,4,99,4.8,25,2.58,2.15,"B"]]},{"c":"MUNGER","dc":"SBPDCL","dist":["Munger"],"nOpf":32.2,"nSc":46,"s":[["2026-10-18",154,84,225,2745,0,27,0,21,0.39,0.49,"N"],["2026-10-19",154,84,174,2136,0,22,0,24,0.3,0.4,"N"],["2026-10-20",154,79,183,2356,0,21,0,23,0.34,0.38,"N"],["2026-10-21",154,87,219,7305,5,55,0,17,1.37,1.12,"N"],["2026-10-22",154,94,291,11293,12,65,0,19,2.12,1.33,"B"],["2026-10-23",154,93,255,9450,12,61,0,23,1.77,1.24,"N"],["2026-10-24",154,85,253,3957,0,35,0,23,0.56,0.64,"N"],["2026-10-25",154,88,217,4963,4,49,0,19,0.71,0.89,"N"],["2026-10-26",154,93,245,7295,7,31,0,20,1.37,0.56,"N"],["2026-10-27",154,81,203,4681,5,68,0,17,0.67,1.39,"N"],["2026-10-28",154,110,350,7010,6,46,0.2,15,1.32,0.84,"N"],["2026-10-29",154,115,688,22532,29,173,31.3,35,4.23,3.53,"W"],["2026-10-30",154,104,486,9892,5,123,7.5,29,1.86,2.51,"W"],["2026-10-31",154,92,315,5328,0,65,3.8,24,0.76,1.33,"N"]]},{"c":"PATNA","dc":"SBPDCL","dist":["Patna"],"nOpf":29,"nSc":66,"s":[["2026-10-18",218,132,473,5967,0,51,0,21,0.81,0.67,"N"],["2026-10-19",218,130,368,4164,0,26,0,21,0.56,0.34,"N"],["2026-10-20",218,134,424,5122,1,55,0,22,0.69,0.72,"N"],["2026-10-21",218,133,460,8106,3,66,0,17,1.21,0.87,"N"],["2026-10-22",218,136,484,9039,5,76,0,19,1.35,1.09,"N"],["2026-10-23",218,134,460,6314,0,56,0,21,0.85,0.74,"N"],["2026-10-24",218,136,459,7387,1,82,0,21,1.11,1.17,"N"],["2026-10-25",218,131,408,5826,1,70,0,18,0.79,0.92,"N"],["2026-10-26",218,133,419,5921,0,64,0,17,0.8,0.84,"N"],["2026-10-27",218,127,470,6676,0,76,0,12,0.9,1.09,"N"],["2026-10-28",218,139,525,7427,1,78,0.6,21,1.11,1.11,"N"],["2026-10-29",218,155,1042,23077,29,183,16.4,24,3.46,2.61,"W"],["2026-10-30",218,154,1123,25543,37,182,29,42,3.83,2.6,"W"],["2026-10-31",218,148,643,9328,2,102,4,30,1.4,1.46,"N"]]},{"c":"PESU EAST","dc":"SBPDCL","dist":["Patna"],"nOpf":6,"nSc":36,"s":[["2026-10-18",154,32,43,1328,1,28,0,21,1.21,0.67,"N"],["2026-10-19",154,31,37,468,0,21,0,21,0.35,0.5,"N"],["2026-10-20",154,33,51,745,0,19,0,22,0.56,0.45,"N"],["2026-10-21",154,72,131,2255,0,80,0,17,2.05,2.16,"B"],["2026-10-22",154,45,73,2152,1,69,0,19,1.96,1.86,"B"],["2026-10-23",154,22,35,799,1,37,0,21,0.6,0.88,"N"],["2026-10-24",154,40,70,918,0,36,0,21,0.69,0.86,"N"],["2026-10-25",154,19,31,455,0,34,0,18,0.34,0.81,"N"],["2026-10-26",154,35,56,782,0,29,0,17,0.59,0.69,"N"],["2026-10-27",154,29,42,1100,1,46,0,12,0.83,1.24,"N"],["2026-10-28",154,43,87,2426,1,42,0.6,21,2.21,1.14,"B"],["2026-10-29",154,49,113,2470,0,100,16.4,24,2.25,2.7,"W"],["2026-10-30",154,58,167,3123,1,116,29,42,2.84,3.14,"W"],["2026-10-31",154,57,128,2507,3,92,4,30,2.28,2.49,"W"]]},{"c":"PESU WEST","dc":"SBPDCL","dist":["Patna"],"nOpf":7.9,"nSc":51,"s":[["2026-10-18",228,24,37,1855,1,32,0,21,1.03,0.51,"N"],["2026-10-19",228,33,49,499,0,23,0,21,0.27,0.37,"N"],["2026-10-20",228,34,48,843,0,39,0,22,0.45,0.62,"N"],["2026-10-21",228,54,78,2090,1,106,0,17,1.16,1.77,"N"],["2026-10-22",228,46,62,2066,2,60,0,19,1.15,0.95,"N"],["2026-10-23",228,45,66,1129,1,38,0,21,0.61,0.6,"N"],["2026-10-24",228,63,88,2514,2,48,0,21,1.39,0.76,"N"],["2026-10-25",228,37,60,1419,1,63,0,18,0.77,1.05,"N"],["2026-10-26",228,66,86,2379,1,51,0,17,1.32,0.81,"N"],["2026-10-27",228,35,61,927,0,63,0,12,0.5,1.05,"N"],["2026-10-28",228,46,66,1803,2,98,0.6,21,0.97,1.63,"N"],["2026-10-29",228,90,197,2842,0,105,16.4,24,1.58,1.75,"N"],["2026-10-30",228,75,156,3108,1,125,29,42,1.72,2.08,"W"],["2026-10-31",228,40,63,1553,1,98,4,30,0.84,1.63,"N"]]},{"c":"SASARAM","dc":"SBPDCL","dist":["Rohtas","Kaimur"],"nOpf":31.1,"nSc":37,"s":[["2026-10-18",329,204,632,9882,8,31,0,17,0.81,0.63,"N"],["2026-10-19",329,199,484,5722,0,26,0,22,0.47,0.53,"N"],["2026-10-20",329,174,499,10037,12,17,0,19,0.82,0.35,"N"],["2026-10-21",329,201,625,21482,29,49,0,16,2.1,1.02,"B"],["2026-10-22",329,196,619,15287,13,61,0,18,1.49,1.27,"N"],["2026-10-23",329,200,648,10248,1,37,0,19,0.84,0.76,"N"],["2026-10-24",329,208,688,12239,7,48,0,18,1.19,0.98,"N"],["2026-10-25",329,197,619,8845,1,34,0,19,0.72,0.69,"N"],["2026-10-26",329,195,642,10237,4,62,0,19,0.84,1.29,"N"],["2026-10-27",329,192,575,9703,7,51,0,19,0.79,1.06,"N"],["2026-10-28",329,203,683,14640,9,32,0.7,26,1.43,0.65,"N"],["2026-10-29",329,249,2061,53721,98,144,18.5,33,5.24,3,"W"],["2026-10-30",329,252,2177,82910,128,182,38.4,44,8.09,3.79,"W"],["2026-10-31",329,215,1212,23681,15,97,0.9,26,2.31,2.02,"W"]]},{"c":"BEGUSARAI","dc":"NBPDCL","dist":["Begusarai","Khagaria"],"nOpf":39.1,"nSc":76,"s":[["2026-10-18",185,176,767,6888,1,54,0,23,0.9,0.64,"N"],["2026-10-19",185,168,717,6083,0,43,0,26,0.8,0.51,"N"],["2026-10-20",185,162,629,5709,0,42,0,21,0.75,0.5,"N"],["2026-10-21",185,164,673,6561,0,75,0,16,0.86,0.89,"N"],["2026-10-22",185,152,605,7900,4,171,0,17,1.09,2.14,"B"],["2026-10-23",185,174,850,14158,5,113,0,21,1.96,1.41,"B"],["2026-10-24",185,169,691,7616,6,98,0,23,1.05,1.23,"N"],["2026-10-25",185,168,856,7997,1,69,0,19,1.11,0.82,"N"],["2026-10-26",185,174,767,6802,0,76,0,21,0.89,0.9,"N"],["2026-10-27",185,169,721,9855,4,84,0,18,1.36,1.05,"N"],["2026-10-28",185,171,806,7228,1,80,0.7,18,0.95,0.95,"N"],["2026-10-29",185,184,1394,17514,20,172,24.7,34,2.42,2.15,"W"],["2026-10-30",185,179,1571,20249,21,206,13.4,34,2.8,2.58,"W"],["2026-10-31",185,163,777,7213,0,104,2.8,23,0.95,1.3,"N"]]},{"c":"CHAPRA","dc":"NBPDCL","dist":["Saran","Siwan","Gopalganj"],"nOpf":29.6,"nSc":180,"s":[["2026-10-18",397,253,697,11734,3,97,0,22,0.89,0.46,"N"],["2026-10-19",397,228,495,7539,0,67,0,22,0.57,0.32,"N"],["2026-10-20",397,241,632,11919,4,85,0,24,0.91,0.4,"N"],["2026-10-21",397,217,612,14803,11,260,0,17,1.24,1.41,"N"],["2026-10-22",397,224,484,11019,2,267,0,17,0.84,1.45,"N"],["2026-10-23",397,221,587,10528,0,284,0,21,0.8,1.54,"N"],["2026-10-24",397,221,510,9512,0,121,0,21,0.72,0.57,"N"],["2026-10-25",397,225,538,10763,4,167,0,18,0.82,0.79,"N"],["2026-10-26",397,257,751,17099,17,184,0,18,1.43,0.87,"N"],["2026-10-27",397,248,711,13720,6,212,0,14,1.15,1.15,"N"],["2026-10-28",397,261,765,13123,6,180,0,18,1.1,0.85,"N"],["2026-10-29",397,253,1013,20494,11,367,13.4,30,1.72,1.99,"B"],["2026-10-30",397,321,2128,65665,112,585,13.9,45,5.51,3.18,"W"],["2026-10-31",397,282,1406,32411,29,459,20.9,31,2.72,2.49,"W"]]},{"c":"DARBHANGA","dc":"NBPDCL","dist":["Darbhanga","Madhubani"],"nOpf":36.8,"nSc":107,"s":[["2026-10-18",341,294,1236,12433,0,97,0,25,0.96,0.57,"N"],["2026-10-19",341,292,1060,8909,0,89,0,20,0.69,0.52,"N"],["2026-10-20",341,301,1069,8924,0,58,0,19,0.69,0.34,"N"],["2026-10-21",341,296,1213,20082,21,255,0,14,1.57,1.75,"N"],["2026-10-22",341,283,1081,12969,3,171,0,17,1.01,1.17,"N"],["2026-10-23",341,295,1075,10953,1,93,0,21,0.84,0.54,"N"],["2026-10-24",341,289,1273,12781,1,97,0,24,0.99,0.57,"N"],["2026-10-25",341,281,1046,11095,1,107,0,19,0.86,0.63,"N"],["2026-10-26",341,292,1306,14975,6,204,0,19,1.17,1.4,"N"],["2026-10-27",341,305,1270,12565,0,146,0,16,0.97,0.85,"N"],["2026-10-28",341,301,1211,15108,7,204,0,14,1.18,1.4,"N"],["2026-10-29",341,323,2485,28708,25,270,10.8,20,2.25,1.85,"B"],["2026-10-30",341,325,3529,63674,92,595,19.8,32,4.98,4.08,"W"],["2026-10-31",341,306,1719,19505,5,201,2.3,26,1.53,1.38,"N"]]},{"c":"KISHANGANJ","dc":"NBPDCL","dist":["Kishanganj","Araria"],"nOpf":25.5,"nSc":40,"s":[["2026-10-18",203,138,345,5478,1,39,0.2,21,1.05,0.98,"N"],["2026-10-19",203,139,334,5553,3,24,0,20,1.06,0.6,"N"],["2026-10-20",203,103,180,2359,0,27,0,16,0.43,0.68,"N"],["2026-10-21",203,138,285,6828,0,116,0,17,1.31,2.9,"B"],["2026-10-22",203,131,289,5215,3,37,0,16,0.95,0.93,"N"],["2026-10-23",203,133,338,5120,0,39,0,19,0.93,0.98,"N"],["2026-10-24",203,134,249,3916,0,26,0,20,0.71,0.65,"N"],["2026-10-25",203,151,360,11023,14,67,0,18,2.11,1.68,"B"],["2026-10-26",203,136,287,4397,0,40,0,21,0.8,1,"N"],["2026-10-27",203,46,77,1337,0,40,0,21,0.24,1,"N"],["2026-10-28",203,106,207,4252,3,61,0.1,22,0.78,1.53,"N"],["2026-10-29",203,144,365,11137,11,63,1.9,21,2.14,1.58,"B"],["2026-10-30",203,138,414,9943,8,121,22.9,35,1.91,3.03,"W"],["2026-10-31",203,162,448,9278,4,52,0.2,17,1.78,1.3,"N"]]},{"c":"MOTIHARI","dc":"NBPDCL","dist":["East Champaran","West Champaran"],"nOpf":32,"nSc":130,"s":[["2026-10-18",346,208,839,8979,1,85,0,21,0.74,0.61,"N"],["2026-10-19",346,195,712,6573,0,72,0,20,0.54,0.51,"N"],["2026-10-20",346,202,618,7189,1,77,0,16,0.6,0.55,"N"],["2026-10-21",346,225,856,20011,24,335,0,14,1.78,2.54,"B"],["2026-10-22",346,228,845,11223,4,123,0,17,0.93,0.88,"N"],["2026-10-23",346,255,1141,13059,7,130,0,20,1.16,0.93,"N"],["2026-10-24",346,223,987,12453,5,140,0,22,1.11,1.06,"N"],["2026-10-25",346,213,932,9442,0,107,0,17,0.78,0.76,"N"],["2026-10-26",346,237,946,12071,6,161,0,18,1.08,1.22,"N"],["2026-10-27",346,235,975,11088,1,132,0,14,0.92,0.94,"N"],["2026-10-28",346,220,900,10995,5,272,0,12,0.91,2.06,"B"],["2026-10-29",346,257,1875,21613,19,353,5.2,26,1.93,2.67,"B"],["2026-10-30",346,265,2549,52257,77,810,24.9,35,4.66,6.14,"W"],["2026-10-31",346,228,1402,24359,24,418,29.8,39,2.17,3.17,"W"]]},{"c":"MUZAFFARPUR","dc":"NBPDCL","dist":["Muzaffarpur","Sitamarhi","Sheohar","Vaishali"],"nOpf":39.1,"nSc":251,"s":[["2026-10-18",354,269,877,8400,2,122,0,24,0.47,0.43,"N"],["2026-10-19",354,267,878,10534,6,126,0,21,0.59,0.44,"N"],["2026-10-20",354,249,837,12340,8,206,0,21,0.7,0.72,"N"],["2026-10-21",354,276,1044,40234,59,544,0,15,2.75,1.94,"B"],["2026-10-22",354,269,1066,17783,16,285,0,17,1.22,1.01,"N"],["2026-10-23",354,264,905,11844,5,281,0,20,0.67,0.99,"N"],["2026-10-24",354,280,1222,20232,15,330,0,23,1.38,1.17,"N"],["2026-10-25",354,253,981,13828,6,180,0,19,0.78,0.63,"N"],["2026-10-26",354,289,1073,13019,4,251,0,21,0.73,0.88,"N"],["2026-10-27",354,279,1070,14635,9,242,0,18,0.82,0.85,"N"],["2026-10-28",354,275,1144,17755,14,591,0,21,1.21,2.1,"B"],["2026-10-29",354,297,2355,34515,51,730,10.4,23,2.36,2.6,"B"],["2026-10-30",354,314,3168,72375,114,1200,18.9,39,4.95,4.27,"W"],["2026-10-31",354,298,1641,23631,9,456,14.6,33,1.61,1.62,"N"]]},{"c":"PURNEA","dc":"NBPDCL","dist":["Purnia","Katihar"],"nOpf":26.3,"nSc":91,"s":[["2026-10-18",261,186,472,7471,0,69,0,20,1.05,0.68,"N"],["2026-10-19",261,176,466,6120,0,53,0,23,0.82,0.52,"N"],["2026-10-20",261,146,285,3554,0,51,0,18,0.48,0.5,"N"],["2026-10-21",261,185,413,6648,0,102,0,17,0.89,1.04,"N"],["2026-10-22",261,177,433,7095,1,67,0,17,0.95,0.66,"N"],["2026-10-23",261,185,444,8117,2,83,0,20,1.14,0.81,"N"],["2026-10-24",261,167,335,5531,0,98,0,20,0.74,0.96,"N"],["2026-10-25",261,200,493,17709,26,131,0,18,2.5,1.34,"B"],["2026-10-26",261,197,471,10063,1,83,0,18,1.42,0.81,"N"],["2026-10-27",261,94,186,2707,0,155,0,18,0.36,1.58,"N"],["2026-10-28",261,157,302,5740,0,103,0.3,20,0.77,1.05,"N"],["2026-10-29",261,192,485,9027,0,164,12.9,28,1.27,1.67,"N"],["2026-10-30",261,222,686,20419,15,274,3.9,28,2.88,2.8,"B"],["2026-10-31",261,195,493,7607,0,115,0.6,16,1.07,1.17,"N"]]},{"c":"SAHARSA","dc":"NBPDCL","dist":["Saharsa","Supaul","Madhepura"],"nOpf":23.3,"nSc":80,"s":[["2026-10-18",297,209,564,6520,0,63,0,22,0.79,0.74,"N"],["2026-10-19",297,212,565,6569,0,54,0,21,0.79,0.64,"N"],["2026-10-20",297,184,429,5955,0,76,0,19,0.72,0.89,"N"],["2026-10-21",297,207,525,6928,0,80,0,16,0.84,0.94,"N"],["2026-10-22",297,213,590,9950,3,103,0,16,1.21,1.26,"N"],["2026-10-23",297,227,606,8685,0,73,0,17,1.06,0.86,"N"],["2026-10-24",297,210,629,8196,2,85,0,22,0.99,1.04,"N"],["2026-10-25",297,216,662,8271,0,60,0,16,1.01,0.71,"N"],["2026-10-26",297,213,586,9101,5,82,0,18,1.11,0.96,"N"],["2026-10-27",297,139,430,5654,3,123,0,13,0.68,1.5,"N"],["2026-10-28",297,169,484,5957,1,88,0.4,19,0.72,1.07,"N"],["2026-10-29",297,241,981,14323,5,154,11.5,26,1.75,1.88,"B"],["2026-10-30",297,262,1430,33725,33,342,18.2,30,4.11,4.17,"W"],["2026-10-31",297,238,882,12319,0,125,1.1,21,1.5,1.52,"N"]]},{"c":"SAMASTIPUR","dc":"NBPDCL","dist":["Samastipur"],"nOpf":24.2,"nSc":174,"s":[["2026-10-18",277,163,400,5392,0,117,0,22,0.55,0.61,"N"],["2026-10-19",277,145,322,4478,0,112,0,20,0.46,0.58,"N"],["2026-10-20",277,183,485,6307,0,107,0,19,0.65,0.56,"N"],["2026-10-21",277,155,419,10302,6,295,0,14,1.16,1.67,"N"],["2026-10-22",277,162,406,10900,10,192,0,16,1.23,1.08,"N"],["2026-10-23",277,172,438,6701,1,97,0,18,0.69,0.51,"N"],["2026-10-24",277,147,341,5724,0,174,0,23,0.59,0.91,"N"],["2026-10-25",277,137,315,5237,1,159,0,18,0.54,0.83,"N"],["2026-10-26",277,186,518,8891,4,177,0,18,0.91,0.92,"N"],["2026-10-27",277,189,496,9762,5,247,0,13,1.1,1.4,"N"],["2026-10-28",277,177,466,9872,7,247,0.4,20,1.11,1.4,"N"],["2026-10-29",277,207,907,21954,20,464,19.3,26,2.47,2.62,"W"],["2026-10-30",277,214,1392,45872,70,798,16.8,34,5.16,4.51,"W"],["2026-10-31",277,209,761,13480,4,431,6.8,24,1.52,2.44,"W"]]}],"div":{"BEGUSARAI":[["BARAUNI",61,50,2016,0],["BEGUSARAI",76,71,3679,0],["KHAGARIA",48,42,1518,0]],"CHAPRA":[["CHAPRA WEST",71,36,4185,1],["CHAPRA-EAST",79,63,4914,3],["GOPALGANJ",57,42,4296,1],["MAHARAJGANJ",57,41,4917,5],["MIRGANJ",65,44,7007,10],["SIWAN",68,56,7092,9]],"DARBHANGA":[["BENIPUR",56,53,3663,2],["DARBHANGA RURAL",75,66,4496,1],["DARBHANGA URBAN",41,32,938,0],["JAYNAGAR",41,39,3459,1],["JHANJHARPUR",56,48,2688,0],["MADHUBANI",72,68,4261,1]],"KISHANGANJ":[["ARARIA",60,46,3946,3],["BAHADURGANJ",62,51,2615,0],["FORBESGANJ",43,36,1923,1],["KISHANGANJ",38,29,794,0]],"MOTIHARI":[["BAGHA",55,24,3115,4],["BETTIAH",99,52,7197,9],["CHAKIA",73,55,6160,8],["MOTIHARI",73,57,5818,3],["RAXAUL",46,40,2069,0]],"MUZAFFARPUR":[["MUZAFFARPUR(E)",59,47,2573,1],["MUZAFFARPUR(U-I)",44,34,1238,0],["MUZAFFARPUR(U-II)",50,43,2795,0],["MUZAFFARPUR(W)",74,67,6573,5],["PUPRI",51,43,3733,0],["SHEOHAR",22,16,2027,1],["SITAMARHI",54,48,4692,2]],"PURNEA":[["BARSOI",34,32,1453,0],["KATIHAR",67,43,2139,0],["PURNEA_EAST",60,49,1599,0],["PURNEA_WEST",100,71,2415,0]],"SAHARSA":[["MADHEPURA",50,42,2153,0],["RAGHOPUR",70,51,2505,0],["SAHARSA",59,44,2214,0],["SIMRI BAKHTIYARPUR",33,29,2318,0],["SUPAUL",51,40,2049,0],["UDAIKISHANGANJ",34,32,1081,0]],"SAMASTIPUR":[["DALSINGHSARAI",42,33,2260,1],["HAJIPUR",69,51,3281,1],["MAHUA",58,40,3257,2],["ROSERA",39,30,1349,0],["SAMASTIPUR",69,55,3333,0]],"ARRAH":[["ARRAH",69,58,4527,5],["BUXAR",106,75,11052,9],["JAGDISHPUR",62,55,5659,3]],"AURANGABAD":[["ARWAL",35,26,3897,2],["AURANGABAD",119,82,8862,7],["DAUDNAGAR",62,41,3524,0]],"BHAGALPUR":[["AMARPUR",38,35,1897,0],["BANKA",50,47,3876,3],["BHAGALPUR(E)",64,49,3198,0],["BHAGALPUR(U)",66,44,1414,0],["NAUGACHIA",33,29,1026,0]],"BIHARSARIF":[["BIHARSHARIF-U",35,12,534,0],["BIHARSHARIFF RURAL",89,76,4437,0],["EKANGARSARAI",54,48,2822,0],["NAWADA",60,26,2506,0],["RAJAULI",47,34,3472,3],["RAJGIR",51,45,2376,0]],"GAYA JI":[["GAYA JI RURAL",70,52,3301,1],["GAYA JI URBAN",66,43,1982,0],["JAHANABAD",116,80,3926,2],["MANPUR",78,55,4558,1],["SHERGHATI",62,45,4422,3]],"JAMUI":[["JAMUI",116,65,3024,1],["SHEIKHPURA",93,50,4882,3]],"MUNGER":[["LAKHISARAI",72,48,3255,0],["MUNGER",82,44,2073,0]],"PATNA":[["BARH",49,38,1973,0],["BIHTA",66,47,3103,0],["FATUHA",35,16,1233,0],["MASAURHI",53,35,2582,2],["PATNA",15,12,438,0]],"PESU EAST":[["BANKIPUR",21,6,106,0],["GULZARBAGH",26,11,237,0],["KANKARBAGH 1",35,0,0,0],["KANKARBAGH 2",35,19,320,0],["PATNA CITY",19,17,1774,3],["RAJENDRA NAGAR",18,4,70,0]],"PESU WEST":[["ASHIYANA",29,6,479,0],["DAKBANGLOW",13,2,131,0],["DANAPUR",32,11,313,0],["GARDANIBAGH",34,2,31,0],["KHAGAUL",39,7,74,0],["NEW CAPITAL",50,4,400,1],["PATLIPUTRA",31,8,126,0]],"SASARAM":[["BHABHUA",118,78,5107,1],["DEHARI",88,61,9037,8],["SASARAM",123,76,9537,6]]},"state":[["2026-10-18",127800,23.7,1187,0.0,0,0],["2026-10-19",106282,19.7,995,0.0,0,0],["2026-10-20",116588,21.7,1104,0.0,0,0],["2026-10-21",282407,52.4,3149,0.0,10,0],["2026-10-22",234005,43.5,2419,0.0,7,0],["2026-10-23",172550,32.0,1826,0.0,1,0],["2026-10-24",183441,34.1,1943,0.0,2,0],["2026-10-25",160130,29.7,1643,0.0,2,0],["2026-10-26",166536,30.9,1906,0.0,0,0],["2026-10-27",144752,26.9,2126,0.0,0,0],["2026-10-28",172746,32.1,2518,0.7,3,0],["2026-10-29",476077,88.4,4624,15.3,8,10],["2026-10-30",745531,138.4,7026,21.3,3,17],["2026-10-31",283375,52.6,3683,6.0,2,9]]};
+(function(){
+var $=function(id){return document.getElementById(id)};
+var nf=new Intl.NumberFormat('en-IN');var f0=function(v){return v==null||isNaN(v)?'–':nf.format(Math.round(v))};
+function hm(m){if(m==null||isNaN(m))return '–';m=Math.max(0,Math.round(m));return Math.floor(m/60)+':'+String(m%60).padStart(2,'0')}
+var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function dl(s){var p=s.split('-');return (+p[2])+' '+MON[+p[1]-1]}
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim()}
+
+/* navigation */
+var secs=[].slice.call(document.querySelectorAll('section[data-t]'));
+$('rail').innerHTML=secs.map(function(s,i){return '<a href="#'+s.id+'"><span class="n">'+String(i+1).padStart(2,'0')+'</span>'+s.dataset.t+'</a>'}).join('');
+$('strip').innerHTML=secs.map(function(s){return '<a href="#'+s.id+'">'+s.dataset.t+'</a>'}).join('')+'<button id="tb2">Theme</button>';
+function mark(){var y=window.scrollY+120,cur=secs[0].id;secs.forEach(function(s){if(s.offsetTop<=y)cur=s.id});
+  [].forEach.call(document.querySelectorAll('#rail a,#strip a'),function(a){var on=a.getAttribute('href')==='#'+cur;a.classList.toggle('on',on);if(on&&a.parentNode.id==='strip'&&a.dataset.cur!=='1'){}})}
+var lastCur='';window.addEventListener('scroll',function(){mark();var a=document.querySelector('#strip a.on');if(a&&a.href!==lastCur){lastCur=a.href;var st=$('strip');st.scrollTo({left:a.offsetLeft-st.clientWidth/2+a.clientWidth/2,behavior:'smooth'})}},{passive:true});mark();
+function theme(t){document.documentElement.dataset.theme=t;try{localStorage.setItem('bgw-exp-theme',t)}catch(e){}$('tb1').textContent=t==='dark'?'Light Theme':'Dark Theme';draw()}
+var t0='light';try{t0=localStorage.getItem('bgw-exp-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')}catch(e){}
+$('tb1').onclick=function(){theme(document.documentElement.dataset.theme==='dark'?'light':'dark')};
+$('tb2').onclick=$('tb1').onclick;
+
+/* circle to district table */
+$('cdmap').innerHTML='<tr><th>Circle</th><th>Discom</th><th>Districts</th><th class="r">Feeders</th></tr>'+DATA.circles.map(function(c){return '<tr><td><b>'+c.c+'</b></td><td>'+c.dc+'</td><td>'+c.dist.join(', ')+'</td><td class="r">'+f0(c.s[c.s.length-1][1])+'</td></tr>'}).join('');
+
+/* tabs table */
+var TABS=[
+ ['Weather History','Working','Date, Circle','Rain, gust, max temp per circle per past day'],
+ ['Weather Forecast','Working','Replaced daily','Today and next 2 days per circle'],
+ ['Grid History','Working','Date, Circle','Feeders, outages, interruptions, minutes, over 4 h, complaints'],
+ ['Division History','Working','Date, Discom, Circle, Division','Division outages'],
+ ['Circle Thresholds','Working','Replaced daily','Rain limit, basis, days of history, normals'],
+ ['Predictions','Working','Target Date, Circle, Lead','Predicted values and ranges, risk, actuals, in range'],
+ ['Model','Working','Replaced daily','Weight per feature, training rows, residual spread'],
+ ['Run Log','Working','Appended','Time, step, OK or Error, message'],
+ ['Daily Circle','Archive','Date, Discom, Circle','Full day record with status and ratios'],
+ ['Daily Division','Archive','Date, Discom, Circle, Division','Division record with average per feeder'],
+ ['Forecast Log','Archive','Issued On, Target, Discom, Circle','Forecast as issued each morning'],
+ ['Prediction Log','Archive','Made On, Target, Lead, Discom, Circle','Prediction as made, actuals added later'],
+ ['Read Me','Archive','Fixed','What each tab holds']];
+$('tabsT').innerHTML='<tr><th>Tab</th><th>Kind</th><th>Key</th><th>Holds</th></tr>'+TABS.map(function(t){return '<tr><td><b>'+t[0]+'</b></td><td>'+t[1]+'</td><td>'+t[2]+'</td><td>'+t[3]+'</td></tr>'}).join('');
+
+/* code map */
+var CM=[
+ ['Code.gs','Entry','setup()','One-time build: tabs, history copy, 92-day backfill, full run, trigger'],
+ ['Code.gs','Entry','runDaily()','The 9 AM sequence of steps'],
+ ['Code.gs','Entry','doGet(e)','Serves the page, or the JSON feed when ?days= is given'],
+ ['Code.gs','Entry','getFeed(days)','Feed for the page through google.script.run'],
+ ['Code.gs','Entry','checkWeatherModels()','Manual check of the six page models'],
+ ['Code.gs','Weather','updateWeather_(pastDays)','Fetches 38 districts, rolls up to circles, writes history and forecast'],
+ ['Code.gs','Archive','archiveGrid_()','Weather Link plus older division totals into Grid History'],
+ ['Code.gs','Archive','archiveDivisions_()','History Divisions into Division History'],
+ ['Code.gs','Archive','archiveToDrive_(all)','Archive tabs and daily JSON files in Drive'],
+ ['Code.gs','Archive','archiveBook_()','Makes sure the archive tabs and Read Me exist'],
+ ['Code.gs','Archive','importOldTabs_()','One-time copy of history from the outage sheet'],
+ ['Code.gs','Status','computeThresholds_()','Normals and learned rain limits per circle'],
+ ['Code.gs','Status','status_(days, d, thr)','Ratio to 28-day normal and W / B / N label'],
+ ['Code.gs','Feed','buildData_(days)','Assembles the JSON feed'],
+ ['Code.gs','Feed','feedJson_(days)','Cache wrapper around buildData_'],
+ ['Code.gs','Feed','predFeed_()','Prediction block: totals, circles, track record'],
+ ['Code.gs','Prediction','normals_(J)','60-day (dry-day) median per circle'],
+ ['Code.gs','Prediction','featRow_()','Builds the 8 feature values for one day'],
+ ['Code.gs','Prediction','trainSet_()','All past circle-days as training rows'],
+ ['Code.gs','Prediction','ridge_(X, y, λ)','Ridge least squares by Gaussian elimination'],
+ ['Code.gs','Prediction','fitModel_()','Refit with negative weather weights set to zero'],
+ ['Code.gs','Prediction','predict_()','Fits both models, predicts 2 days per circle'],
+ ['Code.gs','Prediction','scorePredictions_()','Adds actual figures and in-range flags'],
+ ['Code.gs','Alert','sendAlert_()','Builds and sends the HTML email'],
+ ['Code.gs','Checks','checkSources_()','Daily cross-check of the source sheets'],
+ ['Code.gs','Helpers','joined_()','Joins Grid and Weather History by circle and day'],
+ ['Code.gs','Helpers','upsert_()','Keyed insert or replace, dedupe, sort'],
+ ['Code.gs','Helpers','sheet_(), rows_()','Get or create a tab; read its rows'],
+ ['Code.gs','Helpers','book0_(), src_()','Main sheet; source sheet (read only)'],
+ ['Code.gs','Helpers','step_(), log_()','Run a step safely; write to Run Log'],
+ ['Code.gs','Helpers','asYmd_(), serialToYmd_(), addDays_()','Date handling in IST'],
+ ['Code.gs','Helpers','median_(), avg_(), round_()','Small maths helpers'],
+ ['Index.html','Data','loadGrid()','Gets the feed via getFeed (or a URL if hosted elsewhere)'],
+ ['Index.html','Data','loadWeather()','Three Open-Meteo calls: 6-model daily, current and hourly, district map'],
+ ['Index.html','Data','parseModels()','Six-model consensus and confidence per day'],
+ ['Index.html','Data','agg(scope), predAgg(scope)','Totals for the chosen scope'],
+ ['Index.html','Scope','pickDist(), pickAll(), inScope(), scopeName()','District filter across all views'],
+ ['Index.html','Render','renderOverview(), renderAttention()','Overview tab'],
+ ['Index.html','Render','renderOvWeather(), renderOvBihar()','Weather Now or Weather Across Bihar card'],
+ ['Index.html','Render','renderWeather(), drawMap(), drawTemp()','Weather tab'],
+ ['Index.html','Render','renderGrid(), drawScatter()','Grid vs Weather tab'],
+ ['Index.html','Render','renderPred(), drawPredMap(), drawPv()','Prediction tab'],
+ ['Index.html','Charts','comboChart()','Rain bars with × normal lines'],
+ ['Index.html','PDF','exportPdf(), buildReport()','Four-page landscape A4 report'],
+ ['Index.html','Helpers','pear(), med(), hm(), f0(), dlab()','Correlation, median, h:mm, Indian numbers, dates']];
+function cm(q){q=(q||'').toLowerCase();$('cmT').innerHTML='<tr><th>File</th><th>Group</th><th>Function</th><th>Job</th></tr>'+CM.filter(function(r){return !q||r.join(' ').toLowerCase().indexOf(q)>-1}).map(function(r){return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td><code>'+r[2]+'</code></td><td>'+r[3]+'</td></tr>'}).join('')}
+cm();$('cmq').oninput=function(){cm(this.value)};
+var CFG=[['RUN_HOUR','9','Daily run hour, IST'],['DEFAULT_RAIN_MM','15','Rain limit until a circle learns its own'],['GUST_KMH','45','Gust rule for all circles'],['IMPACT_X','1.8','"Well above normal" multiple'],['NORMAL_WINDOW','28','Days either side for the status normal'],['MIN_HISTORY_DAYS','30','Grid days before rain limits are learned'],['MIN_SAMPLES','3','Rainy days needed in a band'],['RAIN_BANDS','5, 15, 25, 40, 60','Candidate rain limits, mm'],['PRED_MIN_ROWS','40','Training rows before the model is used'],['PRED_TRUSTED_DAYS','60','Days before "Learning" clears'],['RIDGE','1','Penalty λ on model weights'],['FEED_MAX_DAYS','120','Longest feed the page can ask for'],['DIVISION_DAYS','7','Days of division detail in the feed'],['ARCHIVE_REDO_DAYS','3','Days re-saved to the archive each morning'],['RECIPIENTS','[ ]','Alert emails; empty sends to the sheet owner'],['SOURCE / MAIN / COMPLAINT_SHEET_ID','IDs','Outage sheet, this sheet, 1912 sheet'],['ARCHIVE_FOLDER_ID','ID','Drive folder WeatherPrediction'],['TZ','Asia/Kolkata','All dates in IST']];
+$('cfgT').innerHTML='<tr><th>Setting</th><th>Value</th><th>Meaning</th></tr>'+CFG.map(function(r){return '<tr><td><code>'+r[0]+'</code></td><td>'+r[1]+'</td><td>'+r[2]+'</td></tr>'}).join('');
+
+/* glossary */
+var GL=[['DISCOM','Distribution company; here SBPDCL (South Bihar) and NBPDCL (North Bihar)'],['Circle','Field unit of a DISCOM under a Superintending Engineer; 20 in this system'],['Division','Unit within a circle under an Executive Engineer'],['11 kV Feeder','Line from a substation supplying a cluster of distribution transformers'],['Interruption','One supply break on a feeder'],['Outage Min','Total minutes feeders were off in a day'],['Avg Outage Per Feeder','Outage minutes ÷ total feeders; shown as h:mm'],['Feeders Over 4 Hrs','Feeders off more than 4 hours in the day'],['1912','Electricity consumer helpline number in Bihar'],['Supply Complaint','1912 complaint of category Supply Related (no power, voltage and similar)'],['Normal','A circle\'s typical level, a median of recent days'],['× Normal','Today\'s value divided by normal; 1× is an ordinary day'],['Weather-Driven','1.8× normal or more with heavy rain or strong gusts'],['Beyond Weather','1.8× normal or more without such weather'],['Rain Limit','Rain at which a circle starts to suffer; 15 mm until learned'],['Best Match','Open-Meteo\'s automatic choice of the most suitable model for a place'],['Consensus','Median of the six models\' forecasts'],['Ridge Regression','Least-squares fit with a penalty that keeps weights small and stable'],['Feature','An input the model uses, such as rain today'],['Residual Spread','How far past predictions missed; sets the likely range'],['80% Range','Band the actual should fall in about 8 times in 10'],['Apps Script','Google\'s JavaScript platform for Sheets, Drive and Gmail'],['Trigger','Schedule that runs a script function'],['Web App','Apps Script deployment with its own URL'],['google.script.run','Call from the page to a server function in the same project'],['Upsert','Update the row if its key exists, insert it if not'],['Serial Date','Sheets day number counted from 30 Dec 1899'],['jsPDF','Browser library that builds PDF files']];
+$('gl').innerHTML=GL.map(function(g){return '<dt>'+g[0]+'</dt><dd>'+g[1]+'</dd>'}).join('');
+
+/* calculator */
+var W={i:0.049,r:0.301,g:0.257,s:-0.062,y:0.195};
+DATA.circles.forEach(function(c,i){var o=document.createElement('option');o.value=i;o.textContent=c.c+' ('+c.dc+')';$('i_c').appendChild(o)});
+$('i_c').value=0;
+function calc(){var r=+$('i_r').value,g=+$('i_g').value,y=+$('i_y').value,su=$('i_s').checked,c=DATA.circles[+$('i_c').value];
+  $('v_r').textContent=r+' mm';$('v_g').textContent=g+' km/h';$('v_y').textContent=y.toFixed(1)+'×';
+  var p=[['Starting point',W.i],['Rain today',W.r*Math.log(1+r)],['Gust above 30',W.g*Math.max(0,g-30)/10],['Sunday',su?W.s:0],['Yesterday level',W.y*Math.log(Math.max(.05,y))]];
+  var lv=p.reduce(function(a,b){return a+b[1]},0),x=Math.exp(lv),tf=c.s[c.s.length-1][1],opf=c.nOpf*x,sd=0.45;
+  var risk=x>=1.8?['High','p-b']:x>=1.3?['Medium','p-w']:['Normal','p-n'];
+  $('calcOut').innerHTML='<div style="font-size:13px;color:var(--muted)">Predicted level for '+c.c+'</div><div class="big">'+x.toFixed(2)+'× <span class="pill '+risk[1]+'" style="font-size:13px;vertical-align:middle">'+risk[0]+'</span></div>'+
+    '<div style="margin:6px 0 10px;font-size:14px">Avg outage per feeder <b>'+hm(opf)+'</b> (normal '+hm(c.nOpf)+'), about <b>'+f0(opf*tf/60)+'</b> outage hours across '+f0(tf)+' feeders</div>'+
+    p.map(function(q){return '<div class="row"><span>'+q[0]+'</span><span class="mono">'+(q[1]>=0?'+':'')+q[1].toFixed(3)+' → ×'+Math.exp(q[1]).toFixed(2)+'</span></div>'}).join('')+
+    '<div class="row"><span><b>Level</b></span><span class="mono"><b>'+lv.toFixed(3)+' → ×'+x.toFixed(2)+'</b></span></div>'+
+    '<div class="cap">Likely range about ×'+Math.exp(lv-1.2816*sd).toFixed(2)+' to ×'+Math.exp(lv+1.2816*sd).toFixed(2)+' (residual spread 0.45 from the same fit; the range for tomorrow is 25% wider).</div>'}
+['i_r','i_g','i_y','i_s','i_c'].forEach(function(id){$(id).oninput=calc;$(id).onchange=calc});calc();
+
+/* explorer */
+var exSel=0;
+$('exChips').innerHTML=DATA.circles.map(function(c,i){return '<button class="chip'+(i===0?' on':'')+'" data-i="'+i+'">'+c.c+'</button>'}).join('');
+[].forEach.call(document.querySelectorAll('#exChips .chip'),function(b){b.onclick=function(){exSel=+b.dataset.i;[].forEach.call(document.querySelectorAll('#exChips .chip'),function(x){x.classList.toggle('on',x===b)});drawEx()}});
+var STX={W:['Weather-driven','p-w'],B:['Beyond weather','p-b'],N:['Normal','p-n']};
+function combo(s,W0){var W=W0||700,H=230,pl=34,pr=42,pt=12,pb=26,n=s.length,ink=css('--faint'),line=css('--line');
+  var maxR=Math.max(5,Math.max.apply(null,s.map(function(a){return a.rain||0}))),maxX=Math.max(2,Math.max.apply(null,s.map(function(a){return Math.max(a.ro||0,a.rc||0)})));
+  var stp=[1,2,5,10,15,20,25,50,100].find(function(v){return v*4>=maxR})||Math.ceil(maxR/4);maxR=stp*4;var sx=[0.5,1,1.5,2,2.5,5].find(function(v){return v*4>=maxX})||Math.ceil(maxX/4);maxX=sx*4;
+  var bw=(W-pl-pr)/n,x=function(i){return pl+bw*i+bw/2},yR=function(v){return pt+(1-v/maxR)*(H-pt-pb)},yX=function(v){return pt+(1-v/maxX)*(H-pt-pb)};
+  var o='<svg viewBox="0 0 '+W+' '+H+'">';
+  for(var k=0;k<=4;k++){var vy=pt+k*(H-pt-pb)/4;o+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+vy+'" y2="'+vy+'" stroke="'+line+'"/><text x="'+(pl-6)+'" y="'+(vy+4)+'" text-anchor="end" font-size="10.5" fill="'+ink+'">'+Math.round(maxR*(1-k/4))+'</text><text x="'+(W-pr+6)+'" y="'+(vy+4)+'" font-size="10.5" fill="'+ink+'">'+(maxX*(1-k/4)).toFixed(1)+'×</text>'}
+  o+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+yX(1)+'" y2="'+yX(1)+'" stroke="'+ink+'" stroke-dasharray="4 4"/>';
+  s.forEach(function(a,i){var y0=yR(a.rain||0);o+='<rect x="'+(x(i)-bw*.3)+'" y="'+y0+'" width="'+(bw*.6)+'" height="'+Math.max(0,H-pb-y0)+'" rx="3" fill="#3b9cf0" fill-opacity=".5"/>'});
+  [['ro','#f08a24'],['rc','#7c4dff']].forEach(function(L){var p=[];s.forEach(function(a,i){if(a[L[0]]!=null)p.push(x(i)+','+yX(a[L[0]]))});o+='<polyline points="'+p.join(' ')+'" fill="none" stroke="'+L[1]+'" stroke-width="2.5" stroke-linejoin="round"/>';
+    s.forEach(function(a,i){if(a[L[0]]!=null)o+='<circle cx="'+x(i)+'" cy="'+yX(a[L[0]])+'" r="3" fill="'+css('--card')+'" stroke="'+L[1]+'" stroke-width="2"/>'})});
+  s.forEach(function(a,i){if(i%2===0||i===n-1)o+='<text x="'+x(i)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10.5" fill="'+ink+'">'+dl(a.d)+'</text>'});
+  return o+'</svg>'}
+function drawEx(){var c=DATA.circles[exSel],s=c.s.map(function(r){return {d:r[0],tf:r[1],om:r[4],o4:r[5],sc:r[6],rain:r[7],gust:r[8],ro:r[9],rc:r[10],st:r[11]}}),L=s[s.length-1];
+  var cnt={W:0,B:0,N:0};s.forEach(function(a){cnt[a.st]++});
+  var h='<div class="exhead"><span class="t">'+c.c+'</span><span>'+c.dc+' · '+c.dist.join(', ')+'</span><span>'+f0(L.tf)+' feeders</span></div>';
+  h+='<div class="mini"><div><span>Normal outage per feeder</span><b>'+hm(c.nOpf)+'</b></div><div><span>Normal complaints a day</span><b>'+f0(c.nSc)+'</b></div><div><span>31 Oct outage per feeder</span><b>'+hm(L.om/L.tf)+'</b></div><div><span>Days beyond weather / weather-driven</span><b>'+cnt.B+' / '+cnt.W+'</b></div></div>';
+  h+='<div class="svgbox">'+combo(s,window.innerWidth<600?420:700)+'<div class="cap">Blue bars: rain mm (left). Orange: outage × normal. Purple: complaints × normal (right). Dashed: 1×.</div></div>';
+  h+='<div class="tw"><table><tr><th>Day</th><th class="r">Outage per feeder</th><th class="r">× Normal</th><th class="r">Complaints</th><th class="r">× Normal</th><th class="r">Rain mm</th><th class="r">Gust</th><th>Status</th></tr>'+
+    s.slice().reverse().map(function(a){return '<tr><td>'+dl(a.d)+'</td><td class="r">'+hm(a.om/a.tf)+'</td><td class="r">'+(a.ro==null?'–':a.ro.toFixed(2))+'</td><td class="r">'+f0(a.sc)+'</td><td class="r">'+(a.rc==null?'–':a.rc.toFixed(2))+'</td><td class="r">'+(a.rain==null?'–':a.rain.toFixed(1))+'</td><td class="r">'+(a.gust==null?'–':a.gust)+'</td><td><span class="pill '+STX[a.st][1]+'">'+STX[a.st][0]+'</span></td></tr>'}).join('')+'</table></div>';
+  var dv=DATA.div[c.c]||[];
+  if(dv.length)h+='<h4>Divisions on 31 Oct</h4><div class="tw"><table><tr><th>Division</th><th class="r">Feeders</th><th class="r">With outage</th><th class="r">Outage hours</th><th class="r">Per feeder</th><th class="r">Over 4 h</th></tr>'+
+    dv.slice().sort(function(a,b){return b[3]/b[1]-a[3]/a[1]}).map(function(r){return '<tr><td>'+r[0]+'</td><td class="r">'+f0(r[1])+'</td><td class="r">'+f0(r[2])+'</td><td class="r">'+f0(r[3]/60)+'</td><td class="r">'+hm(r[1]?r[3]/r[1]:null)+'</td><td class="r">'+f0(r[4])+'</td></tr>'}).join('')+'</table></div>';
+  $('exBody').innerHTML=h}
+
+/* trend chart */
+function drawTrend(){var S=DATA.state,W=900,H=316,pl=50,pr=50,pt=16,pb=50,n=S.length,ink=css('--faint'),line=css('--line'),txt=css('--muted');
+  var maxH=Math.ceil(Math.max.apply(null,S.map(function(a){return a[1]/60}))*1.12/2500)*2500,maxC=Math.ceil(Math.max.apply(null,S.map(function(a){return a[3]}))/2000)*2000;
+  var bw=(W-pl-pr)/n,x=function(i){return pl+bw*i+bw/2},y1=function(v){return pt+(1-v/maxH)*(H-pt-pb)},y2=function(v){return pt+(1-v/maxC)*(H-pt-pb)};
+  var o='';for(var k=0;k<=4;k++){var vy=pt+k*(H-pt-pb)/4;o+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+vy+'" y2="'+vy+'" stroke="'+line+'"/><text x="'+(pl-6)+'" y="'+(vy+4)+'" text-anchor="end" font-size="11" fill="'+ink+'">'+f0(maxH*(1-k/4))+'</text><text x="'+(W-pr+6)+'" y="'+(vy+4)+'" font-size="11" fill="'+ink+'">'+f0(maxC*(1-k/4))+'</text>'}
+  S.forEach(function(a,i){var v=a[1]/60,yy=y1(v),col=(a[6]>=5&&a[6]>=a[5])?'#f08a24':a[5]>=5?'#dc2626':'#f3b47a';o+='<rect x="'+(x(i)-bw*.32)+'" y="'+yy+'" width="'+(bw*.64)+'" height="'+(H-pb-yy)+'" rx="3" fill="'+col+'"/>';
+    if(a[4]>0.5)o+='<text x="'+x(i)+'" y="'+(H-30)+'" text-anchor="middle" font-size="10.5" fill="#2b7fd3" font-weight="600">'+a[4]+' mm</text>';
+    o+='<text x="'+x(i)+'" y="'+(H-12)+'" text-anchor="middle" font-size="11" fill="'+txt+'">'+dl(a[0])+'</text>'});
+  o+='<polyline points="'+S.map(function(a,i){return x(i)+','+y2(a[3])}).join(' ')+'" fill="none" stroke="#7c4dff" stroke-width="2.5"/>'+S.map(function(a,i){return '<circle cx="'+x(i)+'" cy="'+y2(a[3])+'" r="3.2" fill="'+css('--card')+'" stroke="#7c4dff" stroke-width="2"/>'}).join('');
+  o+='<text x="'+pl+'" y="11" font-size="11" fill="'+txt+'">Outage hours</text><text x="'+(W-pr)+'" y="11" text-anchor="end" font-size="11" fill="#7c4dff">Supply complaints</text>';
+  o+='<g font-size="11" fill="'+txt+'"><rect x="330" y="2" width="10" height="10" fill="#dc2626"/><text x="344" y="11">5+ circles beyond weather</text><rect x="510" y="2" width="10" height="10" fill="#f08a24"/><text x="524" y="11">5+ weather-driven</text></g>';
+  $('trendSvg').innerHTML=o}
+var OBS=[
+ ['29–30 Oct rain','The heaviest rain in the period (circle average 15.3 and 21.3 mm) took statewide outage to '+f0(476077/60)+' and '+f0(745531/60)+' hours, against about 1,770–2,130 on the calm days of 18–20 Oct; on 30 Oct 17 of 20 circles were weather-driven.'],
+ ['21–22 Oct without rain','Outage reached '+f0(282407/60)+' hours on 21 Oct with no rain anywhere; 10 circles were beyond weather, and 7 on 22 Oct. Something other than weather, possibly upstream supply, drove these days.'],
+ ['Complaints track outages','Daily supply complaints and outage minutes moved together almost perfectly (correlation 0.98): 995 complaints on 19 Oct, 7,026 on 30 Oct.'],
+ ['Slow recovery','On 31 Oct, with average rain down to 6 mm, outage was still '+f0(283375/60)+' hours, about 2.2× the calm-day level. Restoration backlog is why yesterday\'s level is a model feature.'],
+ ['Very different baselines','PESU East and West normally lose 6–8 minutes per feeder a day; rural circles such as Begusarai and Muzaffarpur lose about 39. Ratios to each circle\'s own normal make them comparable.'],
+ ['Complaint intensity varies','Muzaffarpur logs about 251 supply complaints on a normal day and Samastipur 174, while Aurangabad logs 33 and Sasaram 37, so complaint counts alone mislead across circles.']];
+$('obs').innerHTML=OBS.map(function(o,i){return '<div class="ob"><div class="ic">'+(i+1)+'</div><div><b>'+o[0]+'.</b> '+o[1]+' <span class="tg d">D</span></div></div>'}).join('');
+
+/* architecture diagram */
+function drawArch(){var ink=css('--ink'),mut=css('--muted'),card=css('--card'),line=css('--line'),acc=css('--acc'),acc2=css('--acc2');
+  function box(x,y,w,h,t,s,c){return '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="12" fill="'+card+'" stroke="'+(c||line)+'" stroke-width="'+(c?2:1.2)+'"/><text x="'+(x+w/2)+'" y="'+(y+h/2-(s?4:-5))+'" text-anchor="middle" font-family="Outfit,system-ui,sans-serif" font-weight="600" font-size="15" fill="'+ink+'">'+t+'</text>'+(s?'<text x="'+(x+w/2)+'" y="'+(y+h/2+15)+'" text-anchor="middle" font-size="11.5" fill="'+mut+'">'+s+'</text>':'')}
+  function ar(x1,y1,x2,y2,l,dash){var mx=(x1+x2)/2,my=(y1+y2)/2;return '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+acc+'" stroke-width="1.8" marker-end="url(#ah)"'+(dash?' stroke-dasharray="5 4"':'')+'/>'+(l?'<text x="'+mx+'" y="'+(my-6)+'" text-anchor="middle" font-size="11" fill="'+mut+'">'+l+'</text>':'')}
+  var o='<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="'+acc+'"/></marker></defs>';
+  o+='<text x="20" y="22" font-size="12" font-weight="600" fill="'+acc2+'">INPUTS</text><text x="360" y="22" font-size="12" font-weight="600" fill="'+acc2+'">APPS SCRIPT</text><text x="720" y="22" font-size="12" font-weight="600" fill="'+acc2+'">OUTPUTS</text>';
+  o+=box(20,40,230,62,'Daily Outage Analytics','Weather Link · History Divisions');
+  o+=box(20,130,230,62,'1912 Call Centre','Supply Related complaints');
+  o+=box(20,220,230,62,'Open-Meteo','38 districts · best match');
+  o+=box(330,90,280,150,'Code.gs','runDaily() at 9 AM',acc);
+  o+='<text x="470" y="200" text-anchor="middle" font-size="11.5" fill="'+mut+'">status · thresholds · prediction</text><text x="470" y="218" text-anchor="middle" font-size="11.5" fill="'+mut+'">upsert · checks · alert</text>';
+  o+=box(700,40,240,58,'Archive Sheet','8 working + 5 archive tabs');
+  o+=box(700,118,240,58,'Drive JSON','one file per day');
+  o+=box(700,196,240,58,'Morning Email','alert and data check');
+  o+=box(330,330,280,70,'Index.html (web app)','Overview · Weather · Grid · Prediction · PDF',acc2);
+  o+=box(20,350,230,62,'Open-Meteo','6 models · live, from browser');
+  o+=box(700,350,240,62,'Officers','browser or phone');
+  o+=ar(250,71,330,130,'')+ar(250,161,330,165,'via Weather Link',true)+ar(250,251,330,200,'');
+  o+=ar(610,130,700,72,'')+ar(610,165,700,147,'')+ar(610,200,700,225,'');
+  o+=ar(470,240,470,330,'getFeed()');o+=ar(250,381,330,370,'');o+=ar(610,370,700,381,'');
+  $('arch').innerHTML=o}
+
+function draw(){drawArch();drawTrend();drawEx()}
+theme(t0);
+window.addEventListener('resize',function(){clearTimeout(window._rt);window._rt=setTimeout(drawEx,200)});
+})();
+</script>
+</body>
+</html>
