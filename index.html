@@ -58,6 +58,9 @@ main{max-width:1200px;margin:0 auto;padding:16px 20px 32px}
 .kpi .v small{font-size:13px;font-weight:500;color:var(--muted);letter-spacing:0;margin-left:4px}
 .kpi .s{font-size:12.5px;color:var(--muted)}
 .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c,var(--accent))}
+.fcrow{grid-template-columns:92px 30px minmax(0,1.2fr) 36px minmax(0,1fr) 36px 70px;cursor:default}
+.fcrow .rn{font-size:13px;line-height:1.3}.fcrow .rn small{color:var(--muted);font-size:11.5px}
+@media (max-width:560px){.fcrow{grid-template-columns:70px 24px minmax(0,1fr) 30px 32px 50px;gap:6px;font-size:13px}.fcrow .track{display:none}.fcrow svg{width:24px;height:24px}}
 .kpi.pred{background:linear-gradient(160deg,#fff,#f1f6fe)}
 .x{display:inline-block;font-size:11.5px;font-weight:700;border-radius:99px;padding:1px 7px}
 .x.hi{color:var(--red);background:var(--redb)}.x.md{color:var(--amb);background:var(--ambb)}.x.lo{color:var(--grn);background:var(--grnb)}
@@ -74,7 +77,6 @@ main{max-width:1200px;margin:0 auto;padding:16px 20px 32px}
 .pg{display:inline-flex;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:3px}
 .pill{border:0;background:none;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer}
 .pill.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(15,27,45,.12)}
-
 /* charts */
 svg{display:block}svg text{font-family:inherit}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--muted);margin-top:8px}
@@ -192,6 +194,7 @@ details.models[open] summary::after{content:"Hide"}
       <button class="tab" data-tab="wx" role="tab">Weather</button>
       <button class="tab" data-tab="gr" role="tab">Grid vs Weather</button>
       <button class="tab" data-tab="pr" role="tab">Prediction</button>
+      <button class="tab" data-tab="fc" role="tab">15-Day Outlook</button>
     </nav>
   </div>
 </header>
@@ -257,6 +260,9 @@ details.models[open] summary::after{content:"Hide"}
 
   <!-- PREDICTION -->
   <section class="pane" id="p-pr"><div id="prBody"></div></section>
+
+  <!-- 15-DAY OUTLOOK -->
+  <section class="pane" id="p-fc"><div id="fcBody"></div></section>
 </main>
 
 <script>
@@ -266,7 +272,7 @@ details.models[open] summary::after{content:"Hide"}
 // Served by the Apps Script web app: the feed comes through google.script.run (no link needed).
 // Only if this page is hosted somewhere else, paste the web app /exec link here.
 var GAS=typeof google!=='undefined'&&google.script&&google.script.run;
-var GRID_API=GAS?'apps-script':'https://script.google.com/macros/s/AKfycbzpJE7RqXaje4mZHbxTQZksUE3jkjbyWylg7ePv69-Jxhy0cfvuaIfxx8DpTpyO9gE9/exec';if(GRID_API.indexOf('PASTE')===0)GRID_API='';
+var GRID_API=GAS?'apps-script':'https://script.google.com/macros/s/AKfycbzpJE7RqXaje4mZHbxTQZksUE3jkjbyWylg7ePv69-Jxhy0cfvuaIfxx8DpTpyO9gE9/exec';
 
 var MODELS=[
   {id:'ecmwf_ifs025',name:'ECMWF',org:'European Centre'},{id:'gfs_seamless',name:'GFS',org:'NOAA, USA'},
@@ -348,9 +354,9 @@ function scopeName(){var g=S.gDis;if(g==='All')return 'Bihar';if(g.indexOf('D:')
 [].forEach.call(document.querySelectorAll('.tab'),function(t){t.onclick=function(){setTab(t.dataset.tab)}});
 function setTab(t){S.tab=t;[].forEach.call(document.querySelectorAll('.tab'),function(x){x.classList.toggle('on',x.dataset.tab===t)});
   [].forEach.call(document.querySelectorAll('.pane'),function(p){p.classList.toggle('on',p.id==='p-'+t)});renderAll()}
-$('refresh').onclick=function(){loadWeather();loadGrid()};
+$('refresh').onclick=function(){S.fc=null;S.fcErr=false;loadWeather();loadGrid();if(S.tab==='fc')loadOutlook()};
 $('pdfBtn').onclick=exportPdf;
-document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-retry]');if(!b)return;if(b.dataset.retry==='wx')loadWeather();else loadGrid()});
+document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-retry]');if(!b)return;if(b.dataset.retry==='wx')loadWeather();else if(b.dataset.retry==='fc'){S.fcErr=false;renderOutlook()}else loadGrid()});
 
 /* ===== Weather data ===== */
 function loadWeather(){
@@ -456,7 +462,70 @@ function dayBox(a){if(!a)return '';
 function renderAll(){
   var t=S.lastWx?S.lastWx.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'';
   $('liveTxt').textContent=S.wxErr?'Weather offline, retrying':(t?'Live · updated '+t:'Connecting')+(S.G&&S.G.asOf?' · grid to '+dlab(S.G.asOf):'');
-  if(S.tab==='ov')renderOverview();else if(S.tab==='wx')renderWeather();else if(S.tab==='gr')renderGrid();else renderPred();
+  if(S.tab==='ov')renderOverview();else if(S.tab==='wx')renderWeather();else if(S.tab==='gr')renderGrid();else if(S.tab==='fc')renderOutlook();else renderPred();
+}
+
+/* ---------- 15-day outlook: all 38 districts, one Open-Meteo request ---------- */
+function loadOutlook(){
+  if(S.fcLoading)return;S.fcLoading=true;
+  var u='https://api.open-meteo.com/v1/forecast?latitude='+D.map(function(d){return d[1]}).join(',')+'&longitude='+D.map(function(d){return d[2]}).join(',')+
+    '&daily=precipitation_sum,precipitation_probability_max,temperature_2m_max,temperature_2m_min,wind_gusts_10m_max,weather_code&forecast_days=16&timezone=Asia%2FKolkata';
+  fetch(u).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(j){
+    if(!Array.isArray(j))j=[j];var dl=j[0].daily.time;
+    S.fc={days:dl,at:new Date(),d:j.map(function(x){var y=x.daily;return dl.map(function(_,k){return {rain:y.precipitation_sum[k],prob:y.precipitation_probability_max[k],tmax:y.temperature_2m_max[k],tmin:y.temperature_2m_min[k],gust:y.wind_gusts_10m_max[k],code:y.weather_code[k]}})})};
+    S.fcErr=false;S.fcLoading=false;if(S.tab==='fc')renderOutlook();
+  }).catch(function(){S.fcErr=true;S.fcLoading=false;if(S.tab==='fc')renderOutlook()});
+}
+function fcBand(k){return k<3?['Next 3 days · reliable','#15803d']:k<7?['Days 4–7 · fair','#92400e']:['Days 8–16 · indicative, read as a trend','#64748b']}
+function renderOutlook(){
+  var el=$('fcBody');
+  if(!S.fc){el.innerHTML='<div class="card">'+(S.fcErr?stateHtml('Outlook unavailable','The weather service did not answer. Try again.','fc'):stateHtml('load'))+'</div>';if(!S.fcErr)loadOutlook();return}
+  var F=S.fc,i=S.dist,R=F.d[i],n=F.days.length,MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],WD=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var dt=function(k){var d=new Date(F.days[k]+'T00:00:00');return {wd:k===0?'Today':k===1?'Tomorrow':WD[d.getDay()],dm:d.getDate()+' '+MON[d.getMonth()]}};
+  var r1=function(v){return v==null?'–':v<0.1?'0':v<10?v.toFixed(1):String(Math.round(v))};
+  /* picker */
+  var h='<div class="pills"><span class="sel" style="position:relative;display:inline-block"><select id="fcSel" aria-label="District">'+D.map(function(d,k){return '<option value="'+k+'"'+(k===i?' selected':'')+'>'+d[0]+'</option>'}).join('')+'</select></span>'+
+    '<button class="pill" id="fcCsv" style="border:1px solid var(--line)">Download CSV</button><button class="pill" id="fcPdf" style="border:1px solid var(--line)">Export PDF</button></div>';
+  /* summary */
+  var wet=R.filter(function(x){return x.rain!=null&&x.rain>=1}).length,wk=-1,hk=-1,ck=-1,gk=-1;
+  R.forEach(function(x,k){if(x.rain!=null&&(wk<0||x.rain>R[wk].rain))wk=k;if(x.tmax!=null&&(hk<0||x.tmax>R[hk].tmax))hk=k;if(x.tmin!=null&&(ck<0||x.tmin<R[ck].tmin))ck=k;if(x.gust!=null&&(gk<0||x.gust>R[gk].gust))gk=k});
+  var tile=function(k,v,s){return '<div class="card kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div><div class="s">'+s+'</div></div>'};
+  h+='<div class="g g4">'+tile('Rainy days',wet+'<small>of '+n+'</small>','1 mm or more')+
+    tile('Wettest day',(wk>-1&&R[wk].rain>=1?r1(R[wk].rain)+'<small>mm</small>':'Dry'),wk>-1&&R[wk].rain>=1?dt(wk).wd+', '+dt(wk).dm:'no rain expected')+
+    tile('Temperature',(ck>-1?Math.round(R[ck].tmin):'–')+'–'+(hk>-1?Math.round(R[hk].tmax):'–')+'<small>°C</small>','coldest night '+(ck>-1?dt(ck).dm:'–')+', hottest day '+(hk>-1?dt(hk).dm:'–'))+
+    tile('Strongest gust',(gk>-1?Math.round(R[gk].gust):'–')+'<small>km/h</small>',gk>-1?dt(gk).wd+', '+dt(gk).dm:'')+'</div>';
+  /* chart: rain bars, max and min temperature lines */
+  var narrow=cw(el,380)<600,W=narrow?520:880,H=narrow?240:210,pl=30,pr=32,pt=14,pb=34,bw=(W-pl-pr)/n,X=function(k){return pl+bw*k+bw/2};
+  var maxR=Math.max(10,Math.ceil(Math.max.apply(null,R.map(function(x){return x.rain||0}))/5)*5);
+  var ts=[].concat(R.map(function(x){return x.tmax}),R.map(function(x){return x.tmin})).filter(function(v){return v!=null});
+  var tLo=Math.floor((Math.min.apply(null,ts)-2)/5)*5,tHi=Math.ceil((Math.max.apply(null,ts)+2)/5)*5;
+  var yR=function(v){return pt+(1-v/maxR)*(H-pt-pb)},yT=function(v){return pt+(1-(v-tLo)/(tHi-tLo))*(H-pt-pb)};
+  var c='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="16-day rain and temperature for '+D[i][0]+'">';
+  [[0,3,'#ecfdf3'],[3,7,'#fffbeb'],[7,n,'#f8fafc']].forEach(function(b){c+='<rect x="'+(pl+bw*b[0])+'" y="'+pt+'" width="'+(bw*(b[1]-b[0]))+'" height="'+(H-pt-pb)+'" fill="'+b[2]+'"/>'});
+  for(var g=0;g<=4;g++){var gy=pt+g*(H-pt-pb)/4;c+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+gy+'" y2="'+gy+'" stroke="#e5eaf1"/>'+
+    '<text x="'+(pl-6)+'" y="'+(gy+4)+'" text-anchor="end" font-size="10.5" fill="#3b9cf0">'+Math.round(maxR*(1-g/4))+'</text><text x="'+(W-pr+6)+'" y="'+(gy+4)+'" font-size="10.5" fill="#94a3b8">'+Math.round(tHi-(tHi-tLo)*g/4)+'°</text>'}
+  R.forEach(function(x,k){if(x.rain!=null&&x.rain>0){var y0=yR(x.rain);c+='<rect x="'+(X(k)-bw*.28)+'" y="'+y0+'" width="'+(bw*.56)+'" height="'+(H-pb-y0)+'" rx="3" fill="#3b9cf0" fill-opacity="'+(k<7?.85:.45)+'"><title>'+dt(k).dm+': '+r1(x.rain)+' mm</title></rect>'}});
+  [['tmax','#f08a24'],['tmin','#6366f1']].forEach(function(L){var pts=[];R.forEach(function(x,k){if(x[L[0]]!=null)pts.push(X(k)+','+yT(x[L[0]]))});c+='<polyline points="'+pts.join(' ')+'" fill="none" stroke="'+L[1]+'" stroke-width="2.4" stroke-linejoin="round"/>'});
+  R.forEach(function(x,k){var d=dt(k);if((narrow?k%3===0:k%2===0)||n<=8)c+='<text x="'+X(k)+'" y="'+(H-18)+'" text-anchor="middle" font-size="10.5" fill="#64748b">'+(k===0?'Today':d.wd.slice(0,3))+'</text><text x="'+X(k)+'" y="'+(H-5)+'" text-anchor="middle" font-size="10" fill="#94a3b8">'+d.dm+'</text>'});
+  c+='</svg>';
+  h+='<div class="card mt"><div class="ch"><h2>'+D[i][0]+' · next '+n+' days</h2><small>Updated '+F.at.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})+'</small></div>'+c+
+    '<div class="legend"><span><i style="background:#3b9cf0"></i>Rain mm (left)</span><span><i style="background:#f08a24;height:3px"></i>Max temp</span><span><i style="background:#6366f1;height:3px"></i>Min temp</span><span><i style="background:#ecfdf3;border:1px solid #bbf7d0"></i>Reliable</span><span><i style="background:#fffbeb;border:1px solid #fde68a"></i>Fair</span><span><i style="background:#f8fafc;border:1px solid #e2e8f0"></i>Indicative</span></div></div>';
+  /* day list */
+  var tMin=Math.min.apply(null,ts),tMax=Math.max.apply(null,ts),list='',lastB='';
+  R.forEach(function(x,k){var b=fcBand(k),d=dt(k);
+    if(b[0]!==lastB){lastB=b[0];list+='<div style="margin:12px 0 4px;font-size:11.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:'+b[1]+'">'+b[0]+'</div>'}
+    var rain=x.rain!=null&&x.rain>=1?'<b style="color:#1f78d1">'+r1(x.rain)+' mm</b>'+(x.prob!=null?'<br><small>'+x.prob+'% chance</small>':''):'<span class="muted">Dry</span>'+(x.prob!=null&&x.prob>=20?'<br><small>'+x.prob+'% chance</small>':'');
+    var gust=x.gust!=null?'<span style="color:'+(x.gust>=45?'#b91c1c':'var(--muted)')+';font-weight:'+(x.gust>=45?700:500)+'">'+Math.round(x.gust)+' km/h</span>':'';
+    list+='<div class="drow fcrow"'+(k>=7?' style="opacity:.78"':'')+'><span class="dn">'+d.wd+'<br><small class="muted">'+d.dm+'</small></span>'+icon(x.code)+'<span class="rn">'+rain+'</span>'+
+      '<span class="lo">'+(x.tmin==null?'–':Math.round(x.tmin)+'°')+'</span>'+rbar(x.tmin,x.tmax,tMin,tMax)+'<span class="hi">'+(x.tmax==null?'–':Math.round(x.tmax)+'°')+'</span><span style="text-align:right;font-size:12.5px">'+gust+'</span></div>'});
+  h+='<div class="card mt"><div class="ch"><h2>Day by day</h2><small>rain · low and high temperature · max gust</small></div>'+list+
+    '<p class="note">Beyond a week no forecast model gives dependable amounts: use days 8–16 to see whether a wet or windy spell is coming, not how much. Open-Meteo best-match forecast for the district headquarters. For warnings follow IMD Patna.</p></div>';
+  el.innerHTML=h;
+  $('fcSel').onchange=function(){pickDist(+this.value)};
+  $('fcPdf').onclick=exportPdf;
+  $('fcCsv').onclick=function(){var rows=[['District','Date','Weather','Rain mm','Rain chance %','Min temp C','Max temp C','Max gust km/h']];
+    R.forEach(function(x,k){rows.push([D[i][0],F.days[k],sky(x.code),x.rain,x.prob,x.tmin,x.tmax,x.gust].map(function(v){return v==null?'':v}))});
+    var csv=rows.map(function(r){return r.join(',')}).join('\n'),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=D[i][0].replace(/ /g,'-')+'-16-day-outlook-'+F.days[0]+'.csv';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500)};
 }
 
 /* ---------- Overview ---------- */
@@ -758,12 +827,67 @@ function rgb(h){var n=parseInt(h.slice(1),16);return [n>>16,(n>>8)&255,n&255]}
 function exportPdf(){
   var b=$('pdfBtn');if(b.disabled)return;b.disabled=true;toast('Preparing the PDF report…');
   (window.jspdf&&window.jspdf.jsPDF&&window.jspdf.jsPDF.API.autoTable?Promise.resolve():loadScript(LIBS[0]).then(function(){return loadScript(LIBS[1])}))
-  .then(function(){var doc=buildReport();var name='Bihar-Grid-Weather-'+(S.G&&S.gSel?S.gSel:new Date().toISOString().slice(0,10))+(S.gDis!=='All'?'-'+S.gDis.replace('D:',''):'')+'.pdf';
+  .then(function(){var fc=S.tab==='fc'&&S.fc,doc=fc?buildOutlookPdf():buildReport();
+    var name=fc?D[S.dist][0].replace(/ /g,'-')+'-15-Day-Outlook-'+S.fc.days[0]+'.pdf':'Bihar-Grid-Weather-'+(S.G&&S.gSel?S.gSel:new Date().toISOString().slice(0,10))+(S.gDis!=='All'?'-'+S.gDis.replace('D:',''):'')+'.pdf';
     var url=null;try{url=doc.output('bloburl')}catch(e){}
     try{doc.save(name)}catch(e){}
     toast('PDF ready.'+(url?' If it did not download, <a href="'+url+'" target="_blank" rel="noopener">open it here</a>.':''),15000)})
   .catch(function(){toast('Could not create the PDF. Please check the connection and try again.',8000)})
   .then(function(){b.disabled=false});
+}
+/* one-page outlook report for the selected district */
+function buildOutlookPdf(){
+  var J=window.jspdf.jsPDF,doc=new J({orientation:'landscape',unit:'mm',format:'a4'}),PW=297,PH=210,M=12;
+  var INK=rgb('#0f1b2d'),MUT=rgb('#5b6b80'),LINE=rgb('#e5eaf1'),ACC=rgb('#1b4fa3');
+  var F=S.fc,i=S.dist,R=F.d[i],n=F.days.length,MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],WD=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var dt=function(k){var d=new Date(F.days[k]+'T00:00:00');return {wd:k===0?'Today':k===1?'Tomorrow':WD[d.getDay()],dm:d.getDate()+' '+MON[d.getMonth()]}};
+  var r1=function(v){return v==null?'–':v<0.1?'0':v<10?v.toFixed(1):String(Math.round(v))};
+  var gen=new Date().toLocaleString('en-IN',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  doc.setFillColor.apply(doc,ACC);doc.rect(0,0,PW,16,'F');doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(13);doc.text('Bihar Grid & Weather · 15-Day Outlook',M,10.5);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.text('generated '+gen,PW-M,10.5,{align:'right'});
+  doc.setTextColor.apply(doc,INK);doc.setFont('helvetica','bold');doc.setFontSize(15);doc.text(D[i][0]+' district',M,26);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor.apply(doc,MUT);doc.text(dt(0).dm+' to '+dt(n-1).dm+' · forecast for the district headquarters',M,31.5);
+  /* tiles */
+  var wet=R.filter(function(x){return x.rain!=null&&x.rain>=1}).length,wk=-1,hk=-1,ck=-1,gk=-1;
+  R.forEach(function(x,k){if(x.rain!=null&&(wk<0||x.rain>R[wk].rain))wk=k;if(x.tmax!=null&&(hk<0||x.tmax>R[hk].tmax))hk=k;if(x.tmin!=null&&(ck<0||x.tmin<R[ck].tmin))ck=k;if(x.gust!=null&&(gk<0||x.gust>R[gk].gust))gk=k});
+  var tiles=[['Rainy days',wet+' of '+n,'1 mm or more','#3b9cf0'],['Wettest day',wk>-1&&R[wk].rain>=1?r1(R[wk].rain)+' mm':'Dry',wk>-1&&R[wk].rain>=1?dt(wk).wd+', '+dt(wk).dm:'no rain expected','#1f78d1'],
+    ['Temperature',(ck>-1?Math.round(R[ck].tmin):'–')+'–'+(hk>-1?Math.round(R[hk].tmax):'–')+' °C','coldest '+(ck>-1?dt(ck).dm:'–')+', hottest '+(hk>-1?dt(hk).dm:'–'),'#f08a24'],
+    ['Strongest gust',(gk>-1?Math.round(R[gk].gust):'–')+' km/h',gk>-1?dt(gk).wd+', '+dt(gk).dm:'',gk>-1&&R[gk].gust>=45?'#b91c1c':'#64748b']];
+  var tw=(PW-2*M-3*5)/4;
+  tiles.forEach(function(t,k){var x=M+k*(tw+5),y=37;doc.setDrawColor.apply(doc,LINE);doc.setFillColor(255,255,255);doc.roundedRect(x,y,tw,22,2,2,'FD');doc.setFillColor.apply(doc,rgb(t[3]));doc.rect(x,y,1.3,22,'F');
+    doc.setFont('helvetica','normal');doc.setFontSize(7.8);doc.setTextColor.apply(doc,MUT);doc.text(t[0],x+4,y+5.5);doc.setFont('helvetica','bold');doc.setFontSize(15);doc.setTextColor.apply(doc,INK);doc.text(t[1],x+4,y+13.5);
+    doc.setFont('helvetica','normal');doc.setFontSize(7.8);doc.setTextColor.apply(doc,MUT);doc.text(t[2],x+4,y+19)});
+  /* chart, left */
+  var cx=M,cy=74,cw2=150,ch=84,pl=10,pr=10,pb=10,iw=cw2-pl-pr,ih=ch-pb,bw=iw/n,X=function(k){return cx+pl+bw*k+bw/2};
+  doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor.apply(doc,INK);doc.text('Rain and temperature',cx,cy-7);
+  var lg=[['Rain mm','#3b9cf0'],['Max temp','#f08a24'],['Min temp','#6366f1']],lx=cx+46;doc.setFont('helvetica','normal');doc.setFontSize(7.2);
+  lg.forEach(function(l,k){doc.setFillColor.apply(doc,rgb(l[1]));if(k===0)doc.rect(lx,cy-9.2,4,2.6,'F');else doc.rect(lx,cy-8.3,4,.9,'F');doc.setTextColor.apply(doc,MUT);doc.text(l[0],lx+5.5,cy-7);lx+=5.5+doc.getTextWidth(l[0])+6});
+  [[0,3,'#ecfdf3'],[3,7,'#fffbeb'],[7,n,'#f1f5f9']].forEach(function(b){doc.setFillColor.apply(doc,rgb(b[2]));doc.rect(cx+pl+bw*b[0],cy,bw*(b[1]-b[0]),ih,'F')});
+  var maxR=Math.max(10,Math.ceil(Math.max.apply(null,R.map(function(x){return x.rain||0}))/5)*5);
+  var ts=[].concat(R.map(function(x){return x.tmax}),R.map(function(x){return x.tmin})).filter(function(v){return v!=null});
+  var tLo=Math.floor((Math.min.apply(null,ts)-2)/5)*5,tHi=Math.ceil((Math.max.apply(null,ts)+2)/5)*5;
+  var yR=function(v){return cy+(1-v/maxR)*ih},yT=function(v){return cy+(1-(v-tLo)/(tHi-tLo))*ih};
+  doc.setLineWidth(.2);doc.setFontSize(6.5);
+  for(var g=0;g<=4;g++){var gy=cy+g*ih/4;doc.setDrawColor.apply(doc,LINE);doc.line(cx+pl,gy,cx+pl+iw,gy);doc.setTextColor(59,156,240);doc.text(String(Math.round(maxR*(1-g/4))),cx+pl-1.5,gy+1,{align:'right'});
+    doc.setTextColor(148,163,184);doc.text(Math.round(tHi-(tHi-tLo)*g/4)+'°',cx+pl+iw+1.5,gy+1)}
+  R.forEach(function(x,k){if(x.rain!=null&&x.rain>0){var y0=yR(x.rain),c=rgb('#3b9cf0');doc.setFillColor.apply(doc,k<7?c:c.map(function(q){return Math.round(q+(255-q)*.5)}));doc.rect(X(k)-bw*.28,y0,bw*.56,cy+ih-y0,'F')}});
+  [['tmax','#f08a24'],['tmin','#6366f1']].forEach(function(L){var pv=null;doc.setDrawColor.apply(doc,rgb(L[1]));doc.setLineWidth(.7);R.forEach(function(x,k){if(x[L[0]]==null){pv=null;return}var pt=[X(k),yT(x[L[0]])];if(pv)doc.line(pv[0],pv[1],pt[0],pt[1]);pv=pt})});
+  doc.setLineWidth(.2);doc.setFontSize(6.3);doc.setTextColor.apply(doc,MUT);
+  R.forEach(function(x,k){if(k%2===0){var d=dt(k);doc.text(k===0?'Today':d.wd.slice(0,3),X(k),cy+ih+4,{align:'center'});doc.text(d.dm,X(k),cy+ih+7.5,{align:'center'})}});
+  doc.setFontSize(6.8);[['Reliable','#15803d',0,3],['Fair','#92400e',3,7],['Indicative','#64748b',7,n]].forEach(function(b){doc.setTextColor.apply(doc,rgb(b[1]));doc.text(b[0],cx+pl+bw*(b[2]+b[3])/2,cy+3.5,{align:'center'})});
+  /* day table, right */
+  var body=R.map(function(x,k){var d=dt(k);return [d.wd+' '+d.dm,sky(x.code),x.rain!=null&&x.rain>=1?r1(x.rain):'Dry',x.prob==null?'–':x.prob+'%',(x.tmin==null?'–':Math.round(x.tmin))+'–'+(x.tmax==null?'–':Math.round(x.tmax)),x.gust==null?'–':String(Math.round(x.gust))]});
+  doc.autoTable({startY:cy-5,margin:{left:M+cw2+8,right:M},head:[['Day','Weather','Rain mm','Chance','Temp °C','Gust km/h']],body:body,theme:'grid',
+    styles:{fontSize:7.4,cellPadding:1.25,lineColor:LINE,lineWidth:.2,textColor:INK},headStyles:{fillColor:rgb('#f4f7fb'),textColor:MUT,fontStyle:'bold'},
+    columnStyles:{2:{halign:'right'},3:{halign:'right'},4:{halign:'center'},5:{halign:'right'}},
+    didParseCell:function(h){if(h.section!=='body')return;var k=h.row.index,x=R[k];
+      if(k>=7)h.cell.styles.textColor=rgb('#64748b');
+      if(h.column.index===0)h.cell.styles.fillColor=rgb(k<3?'#ecfdf3':k<7?'#fffbeb':'#f8fafc');
+      if(h.column.index===2&&x.rain!=null&&x.rain>=1){h.cell.styles.textColor=rgb('#1f78d1');h.cell.styles.fontStyle='bold'}
+      if(h.column.index===5&&x.gust!=null&&x.gust>=45){h.cell.styles.textColor=rgb('#b91c1c');h.cell.styles.fontStyle='bold'}}});
+  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor.apply(doc,MUT);
+  doc.text(doc.splitTextToSize('Next 3 days reliable; days 4–7 fair; days 8–16 indicative only, read as a trend (whether a wet or windy spell is coming), not as exact amounts. Open-Meteo best-match forecast for the district headquarters. For official warnings follow IMD Patna.',PW-2*M),M,PH-12);
+  return doc;
 }
 function buildReport(){
   var J=window.jspdf.jsPDF,doc=new J({orientation:'landscape',unit:'mm',format:'a4'}),PW=297,PH=210,M=12;
